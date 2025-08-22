@@ -1,0 +1,15 @@
+namespace Crm.Application.Services
+{
+    using Crm.Domain.Entities;
+
+    public interface IPipelineService
+    {
+        Task<IEnumerable<Pipeline>> GetPipelinesAsync(Guid? tenantId = null, CancellationToken ct = default);
+
+        Task<IEnumerable<Stage>> GetStagesAsync(Guid pipelineId, CancellationToken ct = default);
+
+        Task<Pipeline> UpsertPipelineAsync(Pipeline pipeline, CancellationToken ct = default);
+
+        Task<Stage> UpsertStageAsync(Stage stage, CancellationToken ct = default);
+    }
+}
