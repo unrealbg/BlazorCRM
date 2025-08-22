@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Crm.Application\Crm.Application.csproj" />
+    <ProjectReference Include="..\..\Crm.Infrastructure\Crm.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Contracts\Crm.Contracts\Crm.Contracts.csproj" />
+    <ProjectReference Include="..\Crm.UI\Crm.UI.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>
