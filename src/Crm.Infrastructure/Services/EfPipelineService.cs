@@ -72,5 +72,31 @@ namespace Crm.Infrastructure.Services
             await _db.SaveChangesAsync(ct);
             return stage;
         }
+
+        public async Task<bool> DeletePipelineAsync(Guid id, CancellationToken ct = default)
+        {
+            var entity = await _db.Pipelines.FindAsync(new object?[] { id }, ct);
+            if (entity is null)
+            {
+                return false;
+            }
+
+            _db.Pipelines.Remove(entity);
+            await _db.SaveChangesAsync(ct);
+            return true;
+        }
+
+        public async Task<bool> DeleteStageAsync(Guid id, CancellationToken ct = default)
+        {
+            var entity = await _db.Stages.FindAsync(new object?[] { id }, ct);
+            if (entity is null)
+            {
+                return false;
+            }
+
+            _db.Stages.Remove(entity);
+            await _db.SaveChangesAsync(ct);
+            return true;
+        }
     }
 }

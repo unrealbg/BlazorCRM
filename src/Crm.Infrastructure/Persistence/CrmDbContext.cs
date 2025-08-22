@@ -1,8 +1,10 @@
 namespace Crm.Infrastructure.Persistence
 {
+    using Crm.Application.Common.Abstractions;
     using Crm.Application.Common.Multitenancy;
     using Crm.Domain.Common;
     using Crm.Domain.Entities;
+    using Crm.Infrastructure.Auditing;
     using Microsoft.AspNetCore.Identity;
     using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore;
@@ -10,23 +12,37 @@ namespace Crm.Infrastructure.Persistence
     public class CrmDbContext : IdentityDbContext<IdentityUser, IdentityRole, string>
     {
         private readonly ITenantProvider _tenantProvider;
+        private readonly ICurrentUser? _currentUser;
 
-        public CrmDbContext(DbContextOptions<CrmDbContext> options, ITenantProvider tenantProvider) : base(options)
+        public CrmDbContext(DbContextOptions<CrmDbContext> options, ITenantProvider tenantProvider, ICurrentUser? currentUser = null) : base(options)
         {
             _tenantProvider = tenantProvider;
+            _currentUser = currentUser;
         }
 
         public DbSet<Tenant> Tenants => Set<Tenant>();
+
         public DbSet<Company> Companies => Set<Company>();
+
         public DbSet<Contact> Contacts => Set<Contact>();
+
         public DbSet<Pipeline> Pipelines => Set<Pipeline>();
+
         public DbSet<Stage> Stages => Set<Stage>();
+
         public DbSet<Deal> Deals => Set<Deal>();
+
         public DbSet<Activity> Activities => Set<Activity>();
+
         public DbSet<TaskItem> Tasks => Set<TaskItem>();
+
         public DbSet<Attachment> Attachments => Set<Attachment>();
+
         public DbSet<Team> Teams => Set<Team>();
+
         public DbSet<UserTeam> UserTeams => Set<UserTeam>();
+
+        public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -39,6 +55,14 @@ namespace Crm.Infrastructure.Persistence
                     builder.Entity(entityType.ClrType).Property<string>(nameof(BaseEntity.ConcurrencyStamp)).IsConcurrencyToken();
                 }
             }
+
+            builder.Entity<AuditEntry>(b =>
+            {
+                b.HasKey(x => x.Id);
+                b.Property(x => x.Entity).HasMaxLength(200);
+                b.Property(x => x.Action).HasMaxLength(50);
+                b.HasIndex(x => new { x.TenantId, x.Entity, x.EntityId, x.CreatedAtUtc });
+            });
 
             builder.Entity<Tenant>(b =>
             {
@@ -119,9 +143,10 @@ namespace Crm.Infrastructure.Persistence
             });
         }
 
-        public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
             var tenantIdCurrent = _tenantProvider.TenantId;
+
             foreach (var entry in ChangeTracker.Entries<ITenantOwned>())
             {
                 if (entry.State == EntityState.Added && entry.Entity.TenantId == Guid.Empty)
@@ -130,7 +155,44 @@ namespace Crm.Infrastructure.Persistence
                 }
             }
 
-            return base.SaveChangesAsync(cancellationToken);
+            ChangeTracker.DetectChanges();
+            var now = DateTime.UtcNow;
+            var audits = new List<AuditEntry>();
+            foreach (var entry in ChangeTracker.Entries().Where(e => e.Entity is BaseEntity && e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted))
+            {
+                var be = (BaseEntity)entry.Entity;
+                var entityName = entry.Entity.GetType().Name;
+                var action = entry.State.ToString();
+                var changes = new Dictionary<string, object?>();
+                if (entry.State == EntityState.Modified)
+                {
+                    foreach (var prop in entry.Properties.Where(p => p.IsModified))
+                    {
+                        if (prop.Metadata.IsConcurrencyToken) continue;
+                        changes[prop.Metadata.Name] = new { Old = prop.OriginalValue, New = prop.CurrentValue };
+                    }
+                }
+
+                audits.Add(new AuditEntry
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = (entry.Entity is ITenantOwned to) ? to.TenantId : tenantIdCurrent,
+                    UserId = _currentUser?.UserId,
+                    Entity = entityName,
+                    EntityId = be.Id.ToString(),
+                    Action = action,
+                    ChangesJson = changes.Count == 0 ? null : System.Text.Json.JsonSerializer.Serialize(changes),
+                    CreatedAtUtc = now,
+                    CorrelationId = _currentUser?.CorrelationId
+                });
+            }
+
+            if (audits.Count > 0)
+            {
+                await AuditEntries.AddRangeAsync(audits, cancellationToken);
+            }
+
+            return await base.SaveChangesAsync(cancellationToken);
         }
     }
 }
