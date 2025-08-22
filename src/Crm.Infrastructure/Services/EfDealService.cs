@@ -46,8 +46,14 @@ namespace Crm.Infrastructure.Services
             else
             {
                 var existing = await _db.Deals.AsTracking().FirstOrDefaultAsync(d => d.Id == deal.Id, ct);
-                if (existing is null) await _db.Deals.AddAsync(deal, ct);
-                else _db.Entry(existing).CurrentValues.SetValues(deal);
+                if (existing is null)
+                {
+                    await _db.Deals.AddAsync(deal, ct);
+                }
+                else
+                {
+                    _db.Entry(existing).CurrentValues.SetValues(deal);
+                }
             }
 
             await _db.SaveChangesAsync(ct);
@@ -64,6 +70,7 @@ namespace Crm.Infrastructure.Services
 
             deal.StageId = stageId;
             await _db.SaveChangesAsync(ct);
+
             return true;
         }
 
@@ -77,6 +84,21 @@ namespace Crm.Infrastructure.Services
 
             deal.OwnerId = ownerId;
             await _db.SaveChangesAsync(ct);
+
+            return true;
+        }
+
+        public async Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
+        {
+            var entity = await _db.Deals.FindAsync(new object?[] { id }, ct);
+            if (entity is null)
+            {
+                return false;
+            }
+
+            _db.Deals.Remove(entity);
+            await _db.SaveChangesAsync(ct);
+
             return true;
         }
     }

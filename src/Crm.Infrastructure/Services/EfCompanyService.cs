@@ -102,5 +102,19 @@ namespace Crm.Infrastructure.Services
 
             return toAdd.Count;
         }
+
+        public async Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
+        {
+            var entity = await _db.Companies.FindAsync(new object?[] { id }, ct);
+            if (entity is null)
+            {
+                return false;
+            }
+
+            _db.Companies.Remove(entity);
+            await _db.SaveChangesAsync(ct);
+
+            return true;
+        }
     }
 }
