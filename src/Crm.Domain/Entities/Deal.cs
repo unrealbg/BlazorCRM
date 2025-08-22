@@ -1,8 +1,12 @@
 namespace Crm.Domain.Entities
 {
+    using Crm.Domain.Common;
     using Crm.Domain.Enums;
-    public class Deal : BaseEntity
+
+    public class Deal : BaseEntity, ITenantOwned
     {
+        public Guid TenantId { get; set; }
+
         public required string Title { get; set; }
 
         public decimal Amount { get; set; }
