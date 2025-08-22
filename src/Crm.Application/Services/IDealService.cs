@@ -13,5 +13,7 @@ namespace Crm.Application.Services
         Task<bool> MoveToStageAsync(Guid dealId, Guid stageId, CancellationToken ct = default);
 
         Task<bool> ChangeOwnerAsync(Guid dealId, Guid? ownerId, CancellationToken ct = default);
+
+        Task<bool> DeleteAsync(Guid id, CancellationToken ct = default);
     }
 }
