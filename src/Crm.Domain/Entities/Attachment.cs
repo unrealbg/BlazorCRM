@@ -15,6 +15,8 @@ namespace Crm.Domain.Entities
 
         public string? BlobRef { get; set; }
 
+        public string? ContentType { get; set; }
+
         public RelatedToType RelatedTo { get; set; }
 
         public Guid? RelatedId { get; set; }
