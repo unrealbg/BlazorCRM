@@ -1,7 +1,11 @@
 namespace Crm.Domain.Entities
 {
-    public class Company : BaseEntity
+    using Crm.Domain.Common;
+
+    public class Company : BaseEntity, ITenantOwned
     {
+        public Guid TenantId { get; set; }
+
         public required string Name { get; set; }
 
         public string? Industry { get; set; }
