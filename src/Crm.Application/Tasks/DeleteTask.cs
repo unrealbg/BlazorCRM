@@ -16,10 +16,7 @@ namespace Crm.Application.Tasks
         private readonly ITaskService _svc;
         public DeleteTaskHandler(ITaskService svc) => _svc = svc;
 
-        public async Task<bool> Handle(DeleteTask r, CancellationToken ct)
-        {
-            var existing = await _svc.GetByIdAsync(r.Id, ct);
-            return existing is not null;
-        }
+        public Task<bool> Handle(DeleteTask r, CancellationToken ct)
+            => _svc.DeleteAsync(r.Id, ct);
     }
 }

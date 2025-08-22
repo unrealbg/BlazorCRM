@@ -4,7 +4,10 @@ namespace Crm.Application.Contacts
     using MediatR;
     using Crm.Application.Services;
     using Crm.Domain.Entities;
+    using Crm.Application.Common.Behaviors;
+    using Crm.Application.Security;
 
+    [RequiresPermission(Permissions.Contacts_Import)]
     public sealed record CreateContact(string FirstName, string LastName, string? Email, string? Phone, string? Position, Guid? CompanyId, string[]? Tags) : IRequest<Guid>;
 
     public sealed class CreateContactValidator : AbstractValidator<CreateContact>

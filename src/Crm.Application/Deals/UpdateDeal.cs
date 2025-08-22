@@ -3,7 +3,10 @@ namespace Crm.Application.Deals
     using FluentValidation;
     using MediatR;
     using Crm.Application.Services;
+    using Crm.Application.Common.Behaviors;
+    using Crm.Application.Security;
 
+    [RequiresPermission(Permissions.Deals_Move)]
     public sealed record UpdateDeal(Guid Id, string Title, decimal Amount, string Currency, int Probability, Guid StageId, Guid? OwnerId, Guid? CompanyId, Guid? ContactId, DateTime? CloseDate) : IRequest<bool>;
 
     public sealed class UpdateDealValidator : AbstractValidator<UpdateDeal>
