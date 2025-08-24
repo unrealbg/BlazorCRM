@@ -37,12 +37,31 @@ namespace Crm.Infrastructure.Services
             else
             {
                 var existing = await _db.Tasks.AsTracking().FirstOrDefaultAsync(a => a.Id == task.Id, ct);
-                if (existing is null) await _db.Tasks.AddAsync(task, ct);
-                else _db.Entry(existing).CurrentValues.SetValues(task);
+                if (existing is null)
+                {
+                    await _db.Tasks.AddAsync(task, ct);
+                }
+                else
+                {
+                    _db.Entry(existing).CurrentValues.SetValues(task);
+                }
             }
 
             await _db.SaveChangesAsync(ct);
             return task;
+        }
+
+        public async Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
+        {
+            var entity = await _db.Tasks.FindAsync(new object?[] { id }, ct);
+            if (entity is null)
+            {
+                return false;
+            }
+
+            _db.Tasks.Remove(entity);
+            await _db.SaveChangesAsync(ct);
+            return true;
         }
     }
 }

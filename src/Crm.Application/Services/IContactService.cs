@@ -13,5 +13,7 @@ namespace Crm.Application.Services
         Task<int> BulkAddTagAsync(IEnumerable<Guid> ids, string tag, CancellationToken ct = default);
 
         Task<int> ImportCsvAsync(Stream csvStream, CancellationToken ct = default);
+
+        Task<bool> DeleteAsync(Guid id, CancellationToken ct = default);
     }
 }

@@ -1,6 +1,7 @@
 namespace Crm.Infrastructure.Services
 {
     using System.Collections.Concurrent;
+    using System.Globalization;
 
     using Crm.Application.Services;
     using Crm.Domain.Entities;
@@ -21,7 +22,7 @@ namespace Crm.Infrastructure.Services
                                            c.Tags.Any(t => t.Contains(s, StringComparison.OrdinalIgnoreCase)));
             }
 
-            return Task.FromResult<IEnumerable<Company>>(result.OrderBy(c => c.Name).ToArray());
+        return Task.FromResult<IEnumerable<Company>>(result.OrderBy(c => c.Name).ToArray());
         }
 
         public Task<Company> GetByIdAsync(Guid id, CancellationToken ct = default)
@@ -29,11 +30,7 @@ namespace Crm.Infrastructure.Services
 
         public Task<Company> UpsertAsync(Company company, CancellationToken ct = default)
         {
-            if (company.Id == Guid.Empty)
-            {
-                company.Id = Guid.NewGuid();
-            }
-
+            if (company.Id == Guid.Empty) company.Id = Guid.NewGuid();
             _store[company.Id] = company;
             return Task.FromResult(company);
         }
@@ -46,14 +43,10 @@ namespace Crm.Infrastructure.Services
                 if (_store.TryGetValue(id, out var c))
                 {
                     if (!c.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase))
-                    {
                         c.Tags.Add(tag);
-                    }
-
                     count++;
                 }
             }
-
             return Task.FromResult(count);
         }
 
@@ -62,15 +55,10 @@ namespace Crm.Infrastructure.Services
             using var reader = new StreamReader(csvStream);
             var header = await reader.ReadLineAsync();
             var rows = 0;
-
             while (!reader.EndOfStream)
             {
                 var line = await reader.ReadLineAsync();
-                if (string.IsNullOrWhiteSpace(line))
-                {
-                    continue;
-                }
-
+                if (string.IsNullOrWhiteSpace(line)) continue;
                 var cols = line.Split(',');
                 var name = cols.ElementAtOrDefault(0)?.Trim() ?? string.Empty;
                 var industry = cols.ElementAtOrDefault(1)?.Trim();
@@ -79,8 +67,13 @@ namespace Crm.Infrastructure.Services
                 await UpsertAsync(new Company { Name = name, Industry = industry, Address = address, Tags = tags });
                 rows++;
             }
-
             return rows;
+        }
+
+        public Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
+        {
+            var ok = _store.TryRemove(id, out _);
+            return Task.FromResult(ok);
         }
     }
 }

@@ -9,5 +9,7 @@ namespace Crm.Application.Services
         Task<TaskItem> GetByIdAsync(Guid id, CancellationToken ct = default);
 
         Task<TaskItem> UpsertAsync(TaskItem task, CancellationToken ct = default);
+
+        Task<bool> DeleteAsync(Guid id, CancellationToken ct = default);
     }
 }

@@ -1,9 +1,12 @@
 namespace Crm.Domain.Entities
 {
+    using Crm.Domain.Common;
     using Crm.Domain.Enums;
 
-    public class Activity : BaseEntity
+    public class Activity : BaseEntity, ITenantOwned
     {
+        public Guid TenantId { get; set; }
+
         public ActivityType Type { get; set; }
 
         public RelatedToType RelatedTo { get; set; }

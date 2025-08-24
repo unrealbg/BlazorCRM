@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Crm.Application\Crm.Application.csproj" />
     <ProjectReference Include="..\Crm.Domain\Crm.Domain.csproj" />
+    <ProjectReference Include="..\Contracts\Crm.Contracts\Crm.Contracts.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -19,6 +20,8 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.0.0" />
+    <PackageReference Include="Quartz" Version="3.9.0" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.5.1" />
   </ItemGroup>
 
   <ItemGroup>

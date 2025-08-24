@@ -49,5 +49,18 @@ namespace Crm.Infrastructure.Services
             await _db.SaveChangesAsync(ct);
             return activity;
         }
+
+        public async Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
+        {
+            var entity = await _db.Activities.FindAsync(new object?[] { id }, ct);
+            if (entity is null)
+            {
+                return false;
+            }
+
+            _db.Activities.Remove(entity);
+            await _db.SaveChangesAsync(ct);
+            return true;
+        }
     }
 }

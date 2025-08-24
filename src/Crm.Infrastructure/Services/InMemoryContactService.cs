@@ -79,5 +79,11 @@ namespace Crm.Infrastructure.Services
 
             return rows;
         }
+
+        public Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
+        {
+            var ok = _store.TryRemove(id, out _);
+            return Task.FromResult(ok);
+        }
     }
 }
