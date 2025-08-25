@@ -4,7 +4,10 @@ namespace Crm.Application.Companies
     using MediatR;
     using Crm.Application.Services;
     using Crm.Domain.Entities;
+    using Crm.Application.Common.Behaviors;
+    using Crm.Application.Security;
 
+    [RequiresPermission(Permissions.Companies_Write)]
     public sealed record UpdateCompany(Guid Id, string Name, string? Industry, string[]? Tags) : IRequest<bool>;
 
     public sealed class UpdateCompanyValidator : AbstractValidator<UpdateCompany>
@@ -23,11 +26,8 @@ namespace Crm.Application.Companies
 
         public async Task<bool> Handle(UpdateCompany r, CancellationToken ct)
         {
-            var current = await _svc.GetByIdAsync(r.Id, ct);
-            current.Name = r.Name;
-            current.Industry = r.Industry;
-            current.Tags = (r.Tags ?? Array.Empty<string>()).ToList();
-            await _svc.UpsertAsync(current, ct);
+            var c = new Company { Id = r.Id, Name = r.Name, Industry = r.Industry, Tags = (r.Tags ?? Array.Empty<string>()).ToList() };
+            await _svc.UpsertAsync(c, ct);
             return true;
         }
     }

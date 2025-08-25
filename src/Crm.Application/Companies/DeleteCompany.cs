@@ -3,7 +3,10 @@ namespace Crm.Application.Companies
     using FluentValidation;
     using MediatR;
     using Crm.Application.Services;
+    using Crm.Application.Common.Behaviors;
+    using Crm.Application.Security;
 
+    [RequiresPermission(Permissions.Companies_Write)]
     public sealed record DeleteCompany(Guid Id) : IRequest<bool>;
 
     public sealed class DeleteCompanyValidator : AbstractValidator<DeleteCompany>

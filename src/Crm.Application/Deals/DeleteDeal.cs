@@ -3,7 +3,10 @@ namespace Crm.Application.Deals
     using FluentValidation;
     using MediatR;
     using Crm.Application.Services;
+    using Crm.Application.Common.Behaviors;
+    using Crm.Application.Security;
 
+    [RequiresPermission(Permissions.Deals_Write)]
     public sealed record DeleteDeal(Guid Id) : IRequest<bool>;
 
     public sealed class DeleteDealValidator : AbstractValidator<DeleteDeal>

@@ -7,6 +7,7 @@ namespace Crm.Application.Contacts
     using Crm.Application.Common.Behaviors;
     using Crm.Application.Security;
 
+    [RequiresPermission(Permissions.Contacts_Write)]
     [RequiresPermission(Permissions.Contacts_Import)]
     public sealed record CreateContact(string FirstName, string LastName, string? Email, string? Phone, string? Position, Guid? CompanyId, string[]? Tags) : IRequest<Guid>;
 

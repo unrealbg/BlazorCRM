@@ -4,7 +4,10 @@ namespace Crm.Application.Deals
     using MediatR;
     using Crm.Application.Services;
     using Crm.Domain.Entities;
+    using Crm.Application.Common.Behaviors;
+    using Crm.Application.Security;
 
+    [RequiresPermission(Permissions.Deals_Write)]
     public sealed record CreateDeal(string Title, decimal Amount, string Currency, int Probability, Guid StageId, Guid? OwnerId, Guid? CompanyId, Guid? ContactId, DateTime? CloseDate) : IRequest<Guid>;
 
     public sealed class CreateDealValidator : AbstractValidator<CreateDeal>

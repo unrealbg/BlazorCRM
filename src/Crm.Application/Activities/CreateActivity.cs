@@ -5,7 +5,10 @@ namespace Crm.Application.Activities
     using Crm.Application.Services;
     using Crm.Domain.Entities;
     using Crm.Domain.Enums;
+    using Crm.Application.Common.Behaviors;
+    using Crm.Application.Security;
 
+    [RequiresPermission(Permissions.Activities_Write)]
     public sealed record CreateActivity(ActivityType Type, Guid? RelatedId, DateTime? DueAt, ActivityStatus Status, string? Notes) : IRequest<Guid>;
 
     public sealed class CreateActivityValidator : AbstractValidator<CreateActivity>

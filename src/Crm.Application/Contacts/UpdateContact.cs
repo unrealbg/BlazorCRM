@@ -3,7 +3,11 @@ namespace Crm.Application.Contacts
     using FluentValidation;
     using MediatR;
     using Crm.Application.Services;
+    using Crm.Domain.Entities;
+    using Crm.Application.Common.Behaviors;
+    using Crm.Application.Security;
 
+    [RequiresPermission(Permissions.Contacts_Write)]
     public sealed record UpdateContact(Guid Id, string FirstName, string LastName, string? Email, string? Phone, string? Position, Guid? CompanyId, string[]? Tags) : IRequest<bool>;
 
     public sealed class UpdateContactValidator : AbstractValidator<UpdateContact>
@@ -11,9 +15,8 @@ namespace Crm.Application.Contacts
         public UpdateContactValidator()
         {
             RuleFor(x => x.Id).NotEmpty();
-            RuleFor(x => x.FirstName).NotEmpty().MaximumLength(100);
-            RuleFor(x => x.LastName).NotEmpty().MaximumLength(100);
-            RuleFor(x => x.Email).EmailAddress().When(x => !string.IsNullOrWhiteSpace(x.Email));
+            RuleFor(x => x.FirstName).NotEmpty();
+            RuleFor(x => x.LastName).NotEmpty();
         }
     }
 
@@ -24,15 +27,8 @@ namespace Crm.Application.Contacts
 
         public async Task<bool> Handle(UpdateContact r, CancellationToken ct)
         {
-            var current = await _svc.GetByIdAsync(r.Id, ct);
-            current.FirstName = r.FirstName;
-            current.LastName = r.LastName;
-            current.Email = r.Email;
-            current.Phone = r.Phone;
-            current.Position = r.Position;
-            current.CompanyId = r.CompanyId;
-            current.Tags = (r.Tags ?? Array.Empty<string>()).ToList();
-            await _svc.UpsertAsync(current, ct);
+            var c = new Contact { Id = r.Id, FirstName = r.FirstName, LastName = r.LastName, Email = r.Email, Phone = r.Phone, Position = r.Position, CompanyId = r.CompanyId, Tags = (r.Tags ?? Array.Empty<string>()).ToList() };
+            await _svc.UpsertAsync(c, ct);
             return true;
         }
     }
