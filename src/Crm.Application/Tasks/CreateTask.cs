@@ -5,7 +5,10 @@ namespace Crm.Application.Tasks
     using Crm.Application.Services;
     using Crm.Domain.Entities;
     using Crm.Domain.Enums;
+    using Crm.Application.Common.Behaviors;
+    using Crm.Application.Security;
 
+    [RequiresPermission(Permissions.Tasks_Write)]
     public sealed record CreateTask(string Title, DateTime? DueAt, Guid? OwnerId, RelatedToType RelatedTo, Guid? RelatedId, TaskPriority Priority, TaskStatus Status) : IRequest<Guid>;
 
     public sealed class CreateTaskValidator : AbstractValidator<CreateTask>

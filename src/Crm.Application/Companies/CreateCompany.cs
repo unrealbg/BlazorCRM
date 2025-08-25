@@ -4,7 +4,10 @@ namespace Crm.Application.Companies
     using MediatR;
     using Crm.Application.Services;
     using Crm.Domain.Entities;
+    using Crm.Application.Common.Behaviors;
+    using Crm.Application.Security;
 
+    [RequiresPermission(Permissions.Companies_Write)]
     public sealed record CreateCompany(string Name, string? Industry, string[]? Tags) : IRequest<Guid>;
 
     public sealed class CreateCompanyValidator : AbstractValidator<CreateCompany>
