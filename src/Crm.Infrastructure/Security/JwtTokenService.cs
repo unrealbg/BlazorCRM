@@ -2,6 +2,7 @@ namespace Crm.Infrastructure.Security
 {
     using System.IdentityModel.Tokens.Jwt;
     using System.Security.Claims;
+    using System.Security.Cryptography;
     using System.Text;
     using Crm.Contracts.Auth;
     using Microsoft.Extensions.Configuration;
@@ -10,6 +11,13 @@ namespace Crm.Infrastructure.Security
     public sealed class JwtTokenService : ITokenService
     {
         private readonly IConfiguration _cfg;
+        private static string Hash(string value)
+        {
+            using var sha = SHA256.Create();
+            var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(value));
+            return Convert.ToHexString(bytes);
+        }
+
         public JwtTokenService(IConfiguration cfg) => _cfg = cfg;
 
         public LoginResponse CreateToken(string userId, string userName, Guid tenantId)
@@ -32,7 +40,10 @@ namespace Crm.Infrastructure.Security
                 expires: expires,
                 signingCredentials: creds);
 
-            return new LoginResponse(new JwtSecurityTokenHandler().WriteToken(token), expires);
+            var refresh = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+            return new LoginResponse(new JwtSecurityTokenHandler().WriteToken(token), expires, refresh);
         }
+
+        public static string HashRefresh(string refreshToken) => Hash(refreshToken);
     }
 }
