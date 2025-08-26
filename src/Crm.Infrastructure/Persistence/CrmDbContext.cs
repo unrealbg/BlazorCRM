@@ -5,11 +5,14 @@ namespace Crm.Infrastructure.Persistence
     using Crm.Domain.Common;
     using Crm.Domain.Entities;
     using Crm.Infrastructure.Auditing;
+    using Crm.Infrastructure.Security;
     using Microsoft.AspNetCore.Identity;
     using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.ChangeTracking; // added for ValueComparer
 
-    public class CrmDbContext : IdentityDbContext<IdentityUser, IdentityRole, string>
+    public class CrmDbContext : IdentityDbContext<IdentityUser, IdentityRole, string>, IDataProtectionKeyContext
     {
         private readonly ITenantProvider _tenantProvider;
         private readonly ICurrentUser? _currentUser;
@@ -19,6 +22,8 @@ namespace Crm.Infrastructure.Persistence
             _tenantProvider = tenantProvider;
             _currentUser = currentUser;
         }
+
+        public DbSet<DataProtectionKey> DataProtectionKeys { get; set; } = default!;
 
         public DbSet<Tenant> Tenants => Set<Tenant>();
 
@@ -44,6 +49,8 @@ namespace Crm.Infrastructure.Persistence
 
         public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
 
+        public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
@@ -55,6 +62,11 @@ namespace Crm.Infrastructure.Persistence
                     builder.Entity(entityType.ClrType).Property<string>(nameof(BaseEntity.ConcurrencyStamp)).IsConcurrencyToken();
                 }
             }
+
+            var stringListComparer = new ValueComparer<List<string>>(
+                (a, b) => (a == null && b == null) || (a != null && b != null && a.SequenceEqual(b)),
+                c => c == null ? 0 : c.Aggregate(0, (acc, v) => HashCode.Combine(acc, v.GetHashCode())),
+                c => c == null ? new List<string>() : c.ToList());
 
             builder.Entity<AuditEntry>(b =>
             {
@@ -76,10 +88,11 @@ namespace Crm.Infrastructure.Persistence
                 b.Property(x => x.Name).IsRequired().HasMaxLength(200);
                 b.Property(x => x.Industry).HasMaxLength(100);
                 b.Property(x => x.Address).HasMaxLength(500);
-                b.Property(x => x.Tags)
+                var prop = b.Property(x => x.Tags)
                     .HasConversion(
                         v => string.Join(',', v ?? new List<string>()),
                         v => string.IsNullOrWhiteSpace(v) ? new List<string>() : v.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(t => t.Trim()).ToList());
+                prop.Metadata.SetValueComparer(stringListComparer);
                 b.HasQueryFilter(e => e.TenantId == _tenantProvider.TenantId);
             });
 
@@ -89,10 +102,11 @@ namespace Crm.Infrastructure.Persistence
                 b.Property(x => x.LastName).IsRequired().HasMaxLength(100);
                 b.Property(x => x.Email).HasMaxLength(256);
                 b.Property(x => x.Phone).HasMaxLength(50);
-                b.Property(x => x.Tags)
+                var prop = b.Property(x => x.Tags)
                     .HasConversion(
                         v => string.Join(',', v ?? new List<string>()),
                         v => string.IsNullOrWhiteSpace(v) ? new List<string>() : v.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(t => t.Trim()).ToList());
+                prop.Metadata.SetValueComparer(stringListComparer);
                 b.HasQueryFilter(e => e.TenantId == _tenantProvider.TenantId);
             });
 
@@ -140,6 +154,15 @@ namespace Crm.Infrastructure.Persistence
             builder.Entity<UserTeam>(b =>
             {
                 b.HasIndex(x => new { x.UserId, x.TeamId }).IsUnique();
+            });
+
+            builder.Entity<RefreshToken>(b =>
+            {
+                b.HasKey(x => x.Id);
+                b.Property(x => x.UserId).IsRequired();
+                b.Property(x => x.TokenHash).IsRequired();
+                b.HasIndex(x => new { x.UserId, x.TokenHash }).IsUnique();
+                b.HasIndex(x => x.ExpiresAtUtc);
             });
         }
 
