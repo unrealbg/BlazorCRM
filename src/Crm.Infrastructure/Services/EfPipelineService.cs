@@ -4,12 +4,19 @@ namespace Crm.Infrastructure.Services
     using Crm.Domain.Entities;
     using Crm.Infrastructure.Persistence;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.Extensions.Caching.Memory;
 
     public class EfPipelineService : IPipelineService
     {
         private readonly CrmDbContext _db;
+        private readonly IMemoryCache _cache;
+        private static readonly string StageMapCacheKey = "stage-map";
 
-        public EfPipelineService(CrmDbContext db) => _db = db;
+        public EfPipelineService(CrmDbContext db, IMemoryCache cache)
+        {
+            _db = db;
+            _cache = cache;
+        }
 
         public async Task<IEnumerable<Pipeline>> GetPipelinesAsync(Guid? tenantId = null, CancellationToken ct = default)
         {
@@ -24,6 +31,25 @@ namespace Crm.Infrastructure.Services
 
         public async Task<IEnumerable<Stage>> GetStagesAsync(Guid pipelineId, CancellationToken ct = default)
             => await _db.Stages.AsNoTracking().Where(s => s.PipelineId == pipelineId).OrderBy(s => s.Order).ToListAsync(ct);
+
+        public async Task<Stage?> GetStageByIdAsync(Guid stageId, CancellationToken ct = default)
+            => await _db.Stages.AsNoTracking().FirstOrDefaultAsync(s => s.Id == stageId, ct);
+
+        public async Task<IDictionary<Guid, string>> GetStageNameMapAsync(Guid? pipelineId = null, CancellationToken ct = default)
+        {
+            var key = pipelineId is Guid pid ? $"{StageMapCacheKey}:{pid}" : StageMapCacheKey;
+            if (_cache.TryGetValue<IDictionary<Guid, string>>(key, out var cached))
+            {
+                return cached;
+            }
+
+            IQueryable<Stage> q = _db.Stages.AsNoTracking();
+            if (pipelineId is Guid pid2) q = q.Where(s => s.PipelineId == pid2);
+            var map = await q.Select(s => new { s.Id, s.Name }).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
+
+            _cache.Set(key, map, new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5) });
+            return map;
+        }
 
         public async Task<Pipeline> UpsertPipelineAsync(Pipeline pipeline, CancellationToken ct = default)
         {
@@ -46,6 +72,7 @@ namespace Crm.Infrastructure.Services
             }
 
             await _db.SaveChangesAsync(ct);
+            _cache.Remove(StageMapCacheKey); // invalidate global map
             return pipeline;
         }
 
@@ -70,6 +97,8 @@ namespace Crm.Infrastructure.Services
             }
 
             await _db.SaveChangesAsync(ct);
+            _cache.Remove(StageMapCacheKey);
+            _cache.Remove($"{StageMapCacheKey}:{stage.PipelineId}");
             return stage;
         }
 
@@ -83,6 +112,7 @@ namespace Crm.Infrastructure.Services
 
             _db.Pipelines.Remove(entity);
             await _db.SaveChangesAsync(ct);
+            _cache.Remove(StageMapCacheKey);
             return true;
         }
 
@@ -96,6 +126,7 @@ namespace Crm.Infrastructure.Services
 
             _db.Stages.Remove(entity);
             await _db.SaveChangesAsync(ct);
+            _cache.Remove(StageMapCacheKey);
             return true;
         }
     }
