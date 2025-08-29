@@ -132,6 +132,13 @@ namespace Crm.Infrastructure.Persistence
 
             builder.Entity<Activity>(b =>
             {
+                b.Property(x => x.Type).IsRequired();
+                b.Property(x => x.Status).IsRequired();
+                b.Property(x => x.Notes).HasMaxLength(1000);
+                b.Property(x => x.DueAt);
+                b.Property(x => x.RelatedTo).IsRequired();
+                b.Property(x => x.RelatedId);
+                b.Property(x => x.OwnerId);
                 b.HasQueryFilter(e => e.TenantId == _tenantProvider.TenantId);
             });
 

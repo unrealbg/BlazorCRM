@@ -18,5 +18,7 @@ namespace Crm.Domain.Entities
         public ActivityStatus Status { get; set; }
 
         public string? Notes { get; set; }
+
+        public Guid? OwnerId { get; set; }
     }
 }

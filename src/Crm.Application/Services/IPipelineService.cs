@@ -5,7 +5,12 @@ namespace Crm.Application.Services
     public interface IPipelineService
     {
         Task<IEnumerable<Pipeline>> GetPipelinesAsync(Guid? tenantId = null, CancellationToken ct = default);
+
         Task<IEnumerable<Stage>> GetStagesAsync(Guid pipelineId, CancellationToken ct = default);
+
+        Task<Stage?> GetStageByIdAsync(Guid stageId, CancellationToken ct = default);
+
+        Task<IDictionary<Guid, string>> GetStageNameMapAsync(Guid? pipelineId = null, CancellationToken ct = default);
 
         Task<Pipeline> UpsertPipelineAsync(Pipeline pipeline, CancellationToken ct = default);
 
