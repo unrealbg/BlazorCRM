@@ -17,7 +17,7 @@ namespace Crm.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.0")
+                .HasAnnotation("ProductVersion", "9.0.8")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -60,6 +60,8 @@ namespace Crm.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("TenantId", "RelatedId");
+
                     b.ToTable("Activities");
                 });
 
@@ -100,6 +102,8 @@ namespace Crm.Infrastructure.Persistence.Migrations
                         .HasColumnType("text");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "RelatedTo", "RelatedId");
 
                     b.ToTable("Attachments");
                 });
@@ -237,6 +241,14 @@ namespace Crm.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("TenantId", "CompanyId");
+
+                    b.HasIndex("TenantId", "ContactId");
+
+                    b.HasIndex("TenantId", "OwnerId");
+
+                    b.HasIndex("TenantId", "StageId");
+
                     b.ToTable("Deals");
                 });
 
@@ -335,6 +347,8 @@ namespace Crm.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "RelatedId");
 
                     b.ToTable("Tasks");
                 });
