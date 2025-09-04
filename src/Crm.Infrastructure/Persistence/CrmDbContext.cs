@@ -127,11 +127,16 @@ namespace Crm.Infrastructure.Persistence
             {
                 b.Property(x => x.Title).IsRequired().HasMaxLength(200);
                 b.Property(x => x.Currency).IsRequired().HasMaxLength(10);
+                b.HasIndex(x => new { x.TenantId, x.StageId });
+                b.HasIndex(x => new { x.TenantId, x.OwnerId });
+                b.HasIndex(x => new { x.TenantId, x.CompanyId });
+                b.HasIndex(x => new { x.TenantId, x.ContactId });
                 b.HasQueryFilter(e => e.TenantId == _tenantProvider.TenantId);
             });
 
             builder.Entity<Activity>(b =>
             {
+                // Align with Activity entity properties
                 b.Property(x => x.Type).IsRequired();
                 b.Property(x => x.Status).IsRequired();
                 b.Property(x => x.Notes).HasMaxLength(1000);
@@ -139,17 +144,20 @@ namespace Crm.Infrastructure.Persistence
                 b.Property(x => x.RelatedTo).IsRequired();
                 b.Property(x => x.RelatedId);
                 b.Property(x => x.OwnerId);
+                b.HasIndex(x => new { x.TenantId, x.RelatedId });
                 b.HasQueryFilter(e => e.TenantId == _tenantProvider.TenantId);
             });
 
             builder.Entity<TaskItem>(b =>
             {
                 b.Property(x => x.Title).IsRequired().HasMaxLength(200);
+                b.HasIndex(x => new { x.TenantId, x.RelatedId });
                 b.HasQueryFilter(e => e.TenantId == _tenantProvider.TenantId);
             });
 
             builder.Entity<Attachment>(b =>
             {
+                b.HasIndex(x => new { x.TenantId, x.RelatedTo, x.RelatedId });
                 b.HasQueryFilter(e => e.TenantId == _tenantProvider.TenantId);
             });
 
