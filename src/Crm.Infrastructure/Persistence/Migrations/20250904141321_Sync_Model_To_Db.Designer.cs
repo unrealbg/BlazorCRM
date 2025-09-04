@@ -12,15 +12,15 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Crm.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(CrmDbContext))]
-    [Migration("20250822220740_Init_All")]
-    partial class Init_All
+    [Migration("20250904141321_Sync_Model_To_Db")]
+    partial class Sync_Model_To_Db
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.0")
+                .HasAnnotation("ProductVersion", "9.0.8")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -40,7 +40,11 @@ namespace Crm.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Notes")
-                        .HasColumnType("text");
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("RelatedId")
                         .HasColumnType("uuid");
@@ -58,6 +62,8 @@ namespace Crm.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "RelatedId");
 
                     b.ToTable("Activities");
                 });
@@ -99,6 +105,8 @@ namespace Crm.Infrastructure.Persistence.Migrations
                         .HasColumnType("text");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "RelatedTo", "RelatedId");
 
                     b.ToTable("Attachments");
                 });
@@ -236,6 +244,14 @@ namespace Crm.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("TenantId", "CompanyId");
+
+                    b.HasIndex("TenantId", "ContactId");
+
+                    b.HasIndex("TenantId", "OwnerId");
+
+                    b.HasIndex("TenantId", "StageId");
+
                     b.ToTable("Deals");
                 });
 
@@ -334,6 +350,8 @@ namespace Crm.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "RelatedId");
 
                     b.ToTable("Tasks");
                 });
