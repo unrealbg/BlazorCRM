@@ -1,10 +1,10 @@
-﻿using System;
-using Microsoft.EntityFrameworkCore.Migrations;
+﻿namespace Crm.Infrastructure.Persistence.Migrations
+{
+    using System;
+    using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace Crm.Infrastructure.Persistence.Migrations
-{
     /// <inheritdoc />
     public partial class AddActivityOwnerAndUpdateMapping : Migration
     {
@@ -21,19 +21,39 @@ namespace Crm.Infrastructure.Persistence.Migrations
                 oldType: "text",
                 oldNullable: true);
 
-            migrationBuilder.AddColumn<Guid>(
-                name: "OwnerId",
-                table: "Activities",
-                type: "uuid",
-                nullable: true);
+            migrationBuilder.Sql(@"
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'Activities'
+          AND column_name = 'OwnerId'
+    ) THEN
+        ALTER TABLE ""Activities"" ADD COLUMN ""OwnerId"" uuid NULL;
+    END IF;
+END $$;
+");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "OwnerId",
-                table: "Activities");
+            migrationBuilder.Sql(@"
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'Activities'
+          AND column_name = 'OwnerId'
+    ) THEN
+        ALTER TABLE ""Activities"" DROP COLUMN ""OwnerId"";
+    END IF;
+END $$;
+");
 
             migrationBuilder.AlterColumn<string>(
                 name: "Notes",
