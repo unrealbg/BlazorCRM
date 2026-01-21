@@ -2,6 +2,7 @@ namespace Crm.Web.Tests.Multitenancy
 {
     using System.Net;
     using System.Net.Http.Headers;
+    using System.Text.RegularExpressions;
     using System.Net.Http.Json;
     using System.Text.Json;
     using System.IdentityModel.Tokens.Jwt;
@@ -21,6 +22,7 @@ namespace Crm.Web.Tests.Multitenancy
         private sealed class TestWebApplicationFactory : WebApplicationFactory<Program>
         {
             public Guid DefaultTenantId { get; } = Guid.Parse("11111111-1111-1111-1111-111111111111");
+            private readonly string _dbName = $"crm-test-{Guid.NewGuid()}";
 
             protected override void ConfigureWebHost(IWebHostBuilder builder)
             {
@@ -43,7 +45,7 @@ namespace Crm.Web.Tests.Multitenancy
                 builder.ConfigureServices(services =>
                 {
                     services.RemoveAll<DbContextOptions<CrmDbContext>>();
-                    services.AddDbContext<CrmDbContext>(o => o.UseInMemoryDatabase($"crm-test-{Guid.NewGuid()}"));
+                    services.AddDbContext<CrmDbContext>(o => o.UseInMemoryDatabase(_dbName));
                 });
             }
         }
@@ -73,6 +75,19 @@ namespace Crm.Web.Tests.Multitenancy
             await userManager.CreateAsync(user, "Admin123$");
         }
 
+        private static async Task<string> GetAntiforgeryTokenAsync(HttpClient client)
+        {
+            var res = await client.GetAsync("/login");
+            res.EnsureSuccessStatusCode();
+
+            var html = await res.Content.ReadAsStringAsync();
+            var match = Regex.Match(html, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"", RegexOptions.IgnoreCase);
+            if (!match.Success)
+                throw new InvalidOperationException("Antiforgery token was not found in the login page.");
+
+            return match.Groups[1].Value;
+        }
+
         [Fact]
         public async Task CookieLogin_SetsTenantClaim_And_AllowsTenantScopedQueries()
         {
@@ -85,8 +100,10 @@ namespace Crm.Web.Tests.Multitenancy
                 HandleCookies = true
             });
 
+            var token = await GetAntiforgeryTokenAsync(client);
             var form = new Dictionary<string, string>
             {
+                ["__RequestVerificationToken"] = token,
                 ["Email"] = "admin@local",
                 ["Password"] = "Admin123$"
             };
