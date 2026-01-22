@@ -1,16 +1,51 @@
 namespace Crm.Infrastructure.Identity
 {
+    using Crm.Application.Common.Multitenancy;
+    using Crm.Domain.Entities;
+    using Crm.Infrastructure.Persistence;
     using Microsoft.AspNetCore.Identity;
+    using Microsoft.EntityFrameworkCore;
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
+    using Microsoft.Extensions.Logging;
+    using Microsoft.Extensions.Options;
 
     public static class IdentitySeeder
     {
+        private sealed class IdentitySeederLog { }
+
         public static async Task SeedAsync(IServiceProvider services, IConfiguration configuration)
         {
             using var scope = services.CreateScope();
             var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
             var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<IdentitySeederLog>>();
+            var options = scope.ServiceProvider.GetRequiredService<IOptions<TenantOptions>>().Value;
+            var db = scope.ServiceProvider.GetRequiredService<CrmDbContext>();
+
+            if (options.DefaultTenantId == Guid.Empty)
+            {
+                throw new InvalidOperationException("Identity seeding requires Tenancy:DefaultTenantId to be configured.");
+            }
+
+            var tenantId = options.DefaultTenantId;
+            var tenantName = string.IsNullOrWhiteSpace(options.DefaultTenantName) ? "Default" : options.DefaultTenantName;
+
+            if (!await db.Tenants.AnyAsync(t => t.Id == tenantId))
+            {
+                await db.Tenants.AddAsync(new Tenant
+                {
+                    Id = tenantId,
+                    Name = tenantName,
+                    Slug = "default"
+                });
+                await db.SaveChangesAsync();
+                logger.LogInformation("Seeded tenant {TenantId} ({TenantName}) for identity.", tenantId, tenantName);
+            }
+            else
+            {
+                logger.LogInformation("Tenant {TenantId} already exists. Skipping tenant seed for identity.", tenantId);
+            }
 
             var rolesCfg = configuration.GetSection("Seed:Roles").GetChildren().Select(c => c.Value!).Where(v => !string.IsNullOrWhiteSpace(v));
             var roles = rolesCfg
@@ -21,7 +56,14 @@ namespace Crm.Infrastructure.Identity
             foreach (var role in roles)
             {
                 if (!await roleManager.RoleExistsAsync(role))
+                {
                     await roleManager.CreateAsync(new IdentityRole(role));
+                    logger.LogInformation("Created role '{Role}'.", role);
+                }
+                else
+                {
+                    logger.LogInformation("Role '{Role}' already exists.", role);
+                }
             }
 
             var adminEmail = configuration["Seed:AdminEmail"] ?? "admin@local";
@@ -43,6 +85,12 @@ namespace Crm.Infrastructure.Identity
                     var error = string.Join(", ", result.Errors.Select(e => e.Description));
                     throw new InvalidOperationException($"Failed to create admin user: {error}");
                 }
+
+                logger.LogInformation("Created admin user '{AdminEmail}'.", adminEmail);
+            }
+            else
+            {
+                logger.LogInformation("Admin user '{AdminEmail}' already exists.", adminEmail);
             }
 
             foreach (var role in adminRolesCfg)
@@ -50,6 +98,11 @@ namespace Crm.Infrastructure.Identity
                 if (!await userManager.IsInRoleAsync(admin, role))
                 {
                     await userManager.AddToRoleAsync(admin, role);
+                    logger.LogInformation("Added role '{Role}' to admin user.", role);
+                }
+                else
+                {
+                    logger.LogInformation("Admin user already has role '{Role}'.", role);
                 }
             }
         }

@@ -40,11 +40,18 @@ namespace Crm.Infrastructure.Services
             var key = pipelineId is Guid pid ? $"{StageMapCacheKey}:{pid}" : StageMapCacheKey;
             if (_cache.TryGetValue<IDictionary<Guid, string>>(key, out var cached))
             {
-                return cached;
+                if (cached is not null)
+                {
+                    return cached;
+                }
             }
 
             IQueryable<Stage> q = _db.Stages.AsNoTracking();
-            if (pipelineId is Guid pid2) q = q.Where(s => s.PipelineId == pid2);
+            if (pipelineId is Guid pid2)
+            {
+                q = q.Where(s => s.PipelineId == pid2);
+            }
+
             var map = await q.Select(s => new { s.Id, s.Name }).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
 
             _cache.Set(key, map, new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5) });
@@ -72,7 +79,7 @@ namespace Crm.Infrastructure.Services
             }
 
             await _db.SaveChangesAsync(ct);
-            _cache.Remove(StageMapCacheKey); // invalidate global map
+            _cache.Remove(StageMapCacheKey);
             return pipeline;
         }
 

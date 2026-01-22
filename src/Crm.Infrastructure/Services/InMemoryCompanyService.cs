@@ -30,7 +30,11 @@ namespace Crm.Infrastructure.Services
 
         public Task<Company> UpsertAsync(Company company, CancellationToken ct = default)
         {
-            if (company.Id == Guid.Empty) company.Id = Guid.NewGuid();
+            if (company.Id == Guid.Empty)
+            {
+                company.Id = Guid.NewGuid();
+            }
+
             _store[company.Id] = company;
             return Task.FromResult(company);
         }
@@ -43,22 +47,35 @@ namespace Crm.Infrastructure.Services
                 if (_store.TryGetValue(id, out var c))
                 {
                     if (!c.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase))
+                    {
                         c.Tags.Add(tag);
+                    }
+
                     count++;
                 }
             }
+
             return Task.FromResult(count);
         }
 
         public async Task<int> ImportCsvAsync(Stream csvStream, CancellationToken ct = default)
         {
             using var reader = new StreamReader(csvStream);
-            var header = await reader.ReadLineAsync();
+            _ = await reader.ReadLineAsync();
             var rows = 0;
-            while (!reader.EndOfStream)
+            while (true)
             {
                 var line = await reader.ReadLineAsync();
-                if (string.IsNullOrWhiteSpace(line)) continue;
+                if (line is null)
+                {
+                    break;
+                }
+
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    continue;
+                }
+
                 var cols = line.Split(',');
                 var name = cols.ElementAtOrDefault(0)?.Trim() ?? string.Empty;
                 var industry = cols.ElementAtOrDefault(1)?.Trim();
@@ -67,6 +84,7 @@ namespace Crm.Infrastructure.Services
                 await UpsertAsync(new Company { Name = name, Industry = industry, Address = address, Tags = tags });
                 rows++;
             }
+
             return rows;
         }
 
