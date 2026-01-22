@@ -1,0 +1,18 @@
+<div class="ui-empty @Class" @attributes="AdditionalAttributes">
+  @if (!string.IsNullOrWhiteSpace(Title))
+  {
+    <div class="text-sm font-semibold text-slate-700 dark:text-slate-200">@Title</div>
+  }
+  @if (!string.IsNullOrWhiteSpace(Description))
+  {
+    <div class="mt-1 text-xs">@Description</div>
+  }
+  @if (ChildContent is not null)
+  {
+    <div class="mt-3 flex justify-center">
+      @ChildContent
+    </div>
+  }
+</div>
+
+
