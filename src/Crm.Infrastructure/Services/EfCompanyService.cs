@@ -79,12 +79,12 @@ namespace Crm.Infrastructure.Services
         public async Task<int> ImportCsvAsync(Stream csvStream, CancellationToken ct = default)
         {
             using var reader = new StreamReader(csvStream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
-            // optional header
             _ = await reader.ReadLineAsync();
             var toAdd = new List<Company>();
-            while (!reader.EndOfStream)
+            while (true)
             {
                 var line = await reader.ReadLineAsync();
+                if (line is null) break;
                 if (string.IsNullOrWhiteSpace(line)) continue;
                 var cols = line.Split(',');
                 var name = cols.ElementAtOrDefault(0)?.Trim() ?? string.Empty;

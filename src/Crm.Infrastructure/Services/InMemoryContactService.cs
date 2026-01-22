@@ -31,7 +31,11 @@ namespace Crm.Infrastructure.Services
 
         public Task<Contact> UpsertAsync(Contact contact, CancellationToken ct = default)
         {
-            if (contact.Id == Guid.Empty) contact.Id = Guid.NewGuid();
+            if (contact.Id == Guid.Empty)
+            {
+                contact.Id = Guid.NewGuid();
+            }
+
             _store[contact.Id] = contact;
             return Task.FromResult(contact);
         }
@@ -44,7 +48,10 @@ namespace Crm.Infrastructure.Services
                 if (_store.TryGetValue(id, out var c))
                 {
                     if (!c.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase))
+                    {
                         c.Tags.Add(tag);
+                    }
+
                     count++;
                 }
             }
@@ -55,12 +62,17 @@ namespace Crm.Infrastructure.Services
         public async Task<int> ImportCsvAsync(Stream csvStream, CancellationToken ct = default)
         {
             using var reader = new StreamReader(csvStream);
-            var header = await reader.ReadLineAsync();
+            _ = await reader.ReadLineAsync();
             var rows = 0;
 
-            while (!reader.EndOfStream)
+            while (true)
             {
                 var line = await reader.ReadLineAsync();
+                if (line is null)
+                {
+                    break;
+                }
+
                 if (string.IsNullOrWhiteSpace(line))
                 {
                     continue;
