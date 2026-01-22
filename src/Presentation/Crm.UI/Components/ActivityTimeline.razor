@@ -1,0 +1,43 @@
+@using Microsoft.AspNetCore.Components
+
+@if (Items?.Any() == true)
+{
+    <ul class="space-y-2">
+        @foreach (var item in Items!)
+        {
+            if (ItemTemplate is not null)
+            {
+                @ItemTemplate(item)
+            }
+            else
+            {
+                <li class="flex items-start gap-3 p-3 rounded-xl hover:bg-white/60 dark:hover:bg-slate-800/40">
+                    <span class="shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/70 dark:bg-slate-800/60 border border-white/40 dark:border-white/10">@item.Icon</span>
+                    <div class="min-w-0">
+                        <div class="font-medium truncate">@item.Title</div>
+                        @if (!string.IsNullOrWhiteSpace(item.Subtitle) || !string.IsNullOrWhiteSpace(item.LinkHref))
+                        {
+                            <div class="text-sm text-slate-500 dark:text-slate-400 truncate">
+                                @item.Subtitle
+                                @if (!string.IsNullOrWhiteSpace(item.LinkHref))
+                                {
+                                    <a class="link ml-2" href="@item.LinkHref">@(item.LinkLabel ?? "Open")</a>
+                                }
+                            </div>
+                        }
+                        @if (item.WhenUtc is not null)
+                        {
+                            <div class="text-xs text-slate-400">@item.WhenUtc.Value.ToLocalTime().ToString("g") @if(!string.IsNullOrWhiteSpace(item.Status)){<span class="ml-2 chip">@item.Status</span>}</div>
+                        }
+                    </div>
+                </li>
+            }
+        }
+    </ul>
+}
+else
+{
+    <div class="text-muted">No activities</div>
+}
+
+
