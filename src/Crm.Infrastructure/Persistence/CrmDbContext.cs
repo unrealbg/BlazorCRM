@@ -11,6 +11,7 @@ namespace Crm.Infrastructure.Persistence
     using Microsoft.EntityFrameworkCore;
     using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.ChangeTracking; // added for ValueComparer
+    using NpgsqlTypes;
 
     public class CrmDbContext : IdentityDbContext<IdentityUser, IdentityRole, string>, IDataProtectionKeyContext
     {
@@ -55,6 +56,8 @@ namespace Crm.Infrastructure.Persistence
         {
             base.OnModelCreating(builder);
 
+            var isNpgsql = Database.IsNpgsql();
+
             foreach (var entityType in builder.Model.GetEntityTypes())
             {
                 if (typeof(BaseEntity).IsAssignableFrom(entityType.ClrType))
@@ -93,6 +96,16 @@ namespace Crm.Infrastructure.Persistence
                         v => string.Join(',', v ?? new List<string>()),
                         v => string.IsNullOrWhiteSpace(v) ? new List<string>() : v.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(t => t.Trim()).ToList());
                 prop.Metadata.SetValueComparer(stringListComparer);
+                if (isNpgsql)
+                {
+                    b.Property<NpgsqlTsVector>("SearchVector")
+                        .HasColumnType("tsvector");
+                    b.HasIndex("SearchVector").HasMethod("GIN");
+                }
+                else
+                {
+                    b.Ignore("SearchVector");
+                }
                 b.HasQueryFilter(e => e.TenantId == _tenantProvider.TenantId);
             });
 
@@ -107,6 +120,16 @@ namespace Crm.Infrastructure.Persistence
                         v => string.Join(',', v ?? new List<string>()),
                         v => string.IsNullOrWhiteSpace(v) ? new List<string>() : v.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(t => t.Trim()).ToList());
                 prop.Metadata.SetValueComparer(stringListComparer);
+                if (isNpgsql)
+                {
+                    b.Property<NpgsqlTsVector>("SearchVector")
+                        .HasColumnType("tsvector");
+                    b.HasIndex("SearchVector").HasMethod("GIN");
+                }
+                else
+                {
+                    b.Ignore("SearchVector");
+                }
                 b.HasQueryFilter(e => e.TenantId == _tenantProvider.TenantId);
             });
 
@@ -127,6 +150,16 @@ namespace Crm.Infrastructure.Persistence
             {
                 b.Property(x => x.Title).IsRequired().HasMaxLength(200);
                 b.Property(x => x.Currency).IsRequired().HasMaxLength(10);
+                if (isNpgsql)
+                {
+                    b.Property<NpgsqlTsVector>("SearchVector")
+                        .HasColumnType("tsvector");
+                    b.HasIndex("SearchVector").HasMethod("GIN");
+                }
+                else
+                {
+                    b.Ignore("SearchVector");
+                }
                 b.HasIndex(x => new { x.TenantId, x.StageId });
                 b.HasIndex(x => new { x.TenantId, x.OwnerId });
                 b.HasIndex(x => new { x.TenantId, x.CompanyId });
@@ -136,7 +169,6 @@ namespace Crm.Infrastructure.Persistence
 
             builder.Entity<Activity>(b =>
             {
-                // Align with Activity entity properties
                 b.Property(x => x.Type).IsRequired();
                 b.Property(x => x.Status).IsRequired();
                 b.Property(x => x.Notes).HasMaxLength(1000);
@@ -178,6 +210,12 @@ namespace Crm.Infrastructure.Persistence
                 b.Property(x => x.TokenHash).IsRequired();
                 b.HasIndex(x => new { x.UserId, x.TokenHash }).IsUnique();
                 b.HasIndex(x => x.ExpiresAtUtc);
+            });
+
+            builder.Entity<SearchResultRow>(b =>
+            {
+                b.HasNoKey();
+                b.ToView(null);
             });
         }
 
