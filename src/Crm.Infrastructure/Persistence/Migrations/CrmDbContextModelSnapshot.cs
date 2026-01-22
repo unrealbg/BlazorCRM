@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using NpgsqlTypes;
 
 #nullable disable
 
@@ -132,6 +133,9 @@ namespace Crm.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<NpgsqlTsVector>("SearchVector")
+                        .HasColumnType("tsvector");
+
                     b.Property<string>("Tags")
                         .IsRequired()
                         .HasColumnType("text");
@@ -140,6 +144,9 @@ namespace Crm.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("SearchVector")
+                        .HasMethod("GIN");
 
                     b.ToTable("Companies");
                 });
@@ -179,6 +186,9 @@ namespace Crm.Infrastructure.Persistence.Migrations
                     b.Property<string>("Position")
                         .HasColumnType("text");
 
+                    b.Property<NpgsqlTsVector>("SearchVector")
+                        .HasColumnType("tsvector");
+
                     b.Property<string>("Tags")
                         .IsRequired()
                         .HasColumnType("text");
@@ -187,6 +197,9 @@ namespace Crm.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("SearchVector")
+                        .HasMethod("GIN");
 
                     b.ToTable("Contacts");
                 });
@@ -225,6 +238,9 @@ namespace Crm.Infrastructure.Persistence.Migrations
                     b.Property<int>("Probability")
                         .HasColumnType("integer");
 
+                    b.Property<NpgsqlTsVector>("SearchVector")
+                        .HasColumnType("tsvector");
+
                     b.Property<Guid>("StageId")
                         .HasColumnType("uuid");
 
@@ -240,6 +256,9 @@ namespace Crm.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("SearchVector")
+                        .HasMethod("GIN");
 
                     b.HasIndex("TenantId", "CompanyId");
 
