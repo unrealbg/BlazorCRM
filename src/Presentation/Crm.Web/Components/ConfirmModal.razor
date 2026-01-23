@@ -1,0 +1,18 @@
+<div class="fixed inset-0 z-50 @(_open?"":"hidden")">
+  <div class="absolute inset-0 bg-black/40" @onclick="Cancel"></div>
+  <div class="relative mx-auto mt-20 w-full max-w-md card p-4">
+    <div class="flex items-center justify-between pb-2 border-b border-white/30 dark:border-white/10">
+      <h2 class="text-lg font-semibold">@Title</h2>
+      <button class="h-8 w-8 rounded-lg hover:bg-white/60 dark:hover:bg-slate-700/50" @onclick="Cancel">?</button>
+    </div>
+    <div class="py-4">
+      @Message
+    </div>
+    <div class="pt-2 border-t border-white/30 dark:border-white/10 flex justify-end gap-2">
+      <button class="btn btn-muted" @onclick="Cancel">@CancelText</button>
+      <button class="btn btn-primary" @onclick="Confirm">@ConfirmText</button>
+    </div>
+  </div>
+</div>
+
+

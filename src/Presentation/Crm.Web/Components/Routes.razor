@@ -1,6 +1,16 @@
-﻿<Router AppAssembly="typeof(Program).Assembly">
-    <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
-        <FocusOnNavigate RouteData="routeData" Selector="h1" />
-    </Found>
+@using Microsoft.AspNetCore.Components.Authorization
+@rendermode InteractiveServer
+
+<Router AppAssembly="@typeof(App).Assembly">
+  <Found Context="routeData">
+    <AuthorizeRouteView RouteData="routeData" DefaultLayout="null">
+      <NotAuthorized>
+        <RedirectToLogin />
+      </NotAuthorized>
+    </AuthorizeRouteView>
+    <FocusOnNavigate RouteData="routeData" Selector="main" />
+  </Found>
+  <NotFound>
+    <div class="card p-4">Not found</div>
+  </NotFound>
 </Router>

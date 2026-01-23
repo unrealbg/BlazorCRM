@@ -1,0 +1,93 @@
+@rendermode InteractiveServer
+
+<nav class="p-3 space-y-2 text-[15px]">
+  <div class="crm-nav-section">CRM</div>
+  <NavLink class="crm-nav-item" ActiveClass="crm-nav-item--active" href="/" Match="NavLinkMatch.All">
+    <span class="crm-nav-left">
+      <span class="crm-nav-icon" aria-hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 10.5L12 3l9 7.5"></path>
+          <path d="M5 9.5V20h14V9.5"></path>
+          <path d="M9 20v-6h6v6"></path>
+        </svg>
+      </span>
+      <span class="crm-nav-label">Dashboard</span>
+    </span>
+  </NavLink>
+  <NavLink class="crm-nav-item" ActiveClass="crm-nav-item--active" href="/companies" Match="NavLinkMatch.Prefix">
+    <span class="crm-nav-left">
+      <span class="crm-nav-icon" aria-hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 21h18"></path>
+          <path d="M6 21V4h8v17"></path>
+          <path d="M14 8h4v13"></path>
+          <path d="M9 7h2M9 11h2M9 15h2"></path>
+        </svg>
+      </span>
+      <span class="crm-nav-label">Companies</span>
+    </span>
+  </NavLink>
+  <NavLink class="crm-nav-item" ActiveClass="crm-nav-item--active" href="/contacts" Match="NavLinkMatch.Prefix">
+    <span class="crm-nav-left">
+      <span class="crm-nav-icon" aria-hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="8" r="3.5"></circle>
+          <path d="M4 20c1.5-4 6-6 8-6s6.5 2 8 6"></path>
+        </svg>
+      </span>
+      <span class="crm-nav-label">Contacts</span>
+    </span>
+  </NavLink>
+  <NavLink class="crm-nav-item" ActiveClass="crm-nav-item--active" href="/deals" Match="NavLinkMatch.Prefix">
+    <span class="crm-nav-left">
+      <span class="crm-nav-icon" aria-hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 19h16"></path>
+          <path d="M7 16V8"></path>
+          <path d="M12 16V5"></path>
+          <path d="M17 16v-6"></path>
+        </svg>
+      </span>
+      <span class="crm-nav-label">Deals</span>
+    </span>
+  </NavLink>
+  <NavLink class="crm-nav-item" ActiveClass="crm-nav-item--active" href="/activities" Match="NavLinkMatch.Prefix">
+    <span class="crm-nav-left">
+      <span class="crm-nav-icon" aria-hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8 7h10"></path>
+          <path d="M8 11h10"></path>
+          <path d="M8 15h6"></path>
+          <rect x="3" y="4" width="2.5" height="2.5" rx="0.5"></rect>
+          <rect x="3" y="10" width="2.5" height="2.5" rx="0.5"></rect>
+          <rect x="3" y="14" width="2.5" height="2.5" rx="0.5"></rect>
+        </svg>
+      </span>
+      <span class="crm-nav-label">Activities</span>
+    </span>
+  </NavLink>
+  <NavLink class="crm-nav-item" ActiveClass="crm-nav-item--active" href="/tasks" Match="NavLinkMatch.Prefix">
+    <span class="crm-nav-left">
+      <span class="crm-nav-icon" aria-hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="4" width="16" height="16" rx="3"></rect>
+          <path d="M8 12l2.5 2.5L16 9"></path>
+        </svg>
+      </span>
+      <span class="crm-nav-label">Tasks</span>
+    </span>
+  </NavLink>
+
+  <div class="crm-nav-section mt-4">System</div>
+  <NavLink class="crm-nav-item" ActiveClass="crm-nav-item--active" href="/settings" Match="NavLinkMatch.Prefix">
+    <span class="crm-nav-left">
+      <span class="crm-nav-icon" aria-hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19 12a7 7 0 0 0-.1-1l2-1.2-2-3.5-2.3.9a7 7 0 0 0-1.7-1l-.3-2.5H9.4l-.3 2.5a7 7 0 0 0-1.7 1l-2.3-.9-2 3.5 2 1.2a7 7 0 0 0 0 2l-2 1.2 2 3.5 2.3-.9a7 7 0 0 0 1.7 1l.3 2.5h4.2l.3-2.5a7 7 0 0 0 1.7-1l2.3.9 2-3.5-2-1.2c.1-.3.1-.7.1-1z"></path>
+        </svg>
+      </span>
+      <span class="crm-nav-label">Settings</span>
+    </span>
+  </NavLink>
+</nav>
