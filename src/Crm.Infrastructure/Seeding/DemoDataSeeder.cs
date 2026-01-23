@@ -11,6 +11,10 @@ namespace Crm.Infrastructure.Seeding
     public static class DemoDataSeeder
     {
         private sealed class DemoDataSeederLog { }
+        private sealed class SeedTenantProvider : ITenantProvider
+        {
+            public Guid TenantId => Guid.Empty;
+        }
 
         public static async Task SeedAsync(IServiceProvider sp, CancellationToken ct = default)
         {
@@ -18,29 +22,30 @@ namespace Crm.Infrastructure.Seeding
             var logger = sp.GetRequiredService<ILogger<DemoDataSeederLog>>();
             var options = sp.GetRequiredService<IOptions<TenantOptions>>().Value;
 
-            if (options.DefaultTenantId == Guid.Empty)
-            {
-                throw new InvalidOperationException("Demo data seeding requires Tenancy:DefaultTenantId to be configured.");
-            }
+            var tenantSlug = string.IsNullOrWhiteSpace(options.DefaultTenantSlug) ? "demo" : options.DefaultTenantSlug;
+            var tenantName = string.IsNullOrWhiteSpace(options.DefaultTenantName) ? "Demo" : options.DefaultTenantName;
 
-            var tenantId = options.DefaultTenantId;
-            var tenantName = string.IsNullOrWhiteSpace(options.DefaultTenantName) ? "Default" : options.DefaultTenantName;
-
-            if (!await db.Tenants.AnyAsync(t => t.Id == tenantId, ct))
+            var tenant = await db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == tenantSlug, ct);
+            if (tenant is null)
             {
-                await db.Tenants.AddAsync(new Tenant
+                tenant = new Tenant
                 {
-                    Id = tenantId,
+                    Id = Guid.NewGuid(),
                     Name = tenantName,
-                    Slug = "default"
-                }, ct);
-                await db.SaveChangesAsync(ct);
-                logger.LogInformation("Seeded tenant {TenantId} ({TenantName}).", tenantId, tenantName);
+                    Slug = tenantSlug
+                };
+                var dbOptions = sp.GetRequiredService<DbContextOptions<CrmDbContext>>();
+                await using var seedDb = new CrmDbContext(dbOptions, new SeedTenantProvider());
+                await seedDb.Tenants.AddAsync(tenant, ct);
+                await seedDb.SaveChangesAsync(ct);
+                logger.LogInformation("Seeded tenant {TenantId} ({TenantName}).", tenant.Id, tenantName);
             }
             else
             {
-                logger.LogInformation("Tenant {TenantId} already exists. Skipping tenant seed.", tenantId);
+                logger.LogInformation("Tenant {TenantId} already exists. Skipping tenant seed.", tenant.Id);
             }
+
+            var tenantId = tenant.Id;
 
             var pipeline = await db.Pipelines.FirstOrDefaultAsync(p => p.TenantId == tenantId && p.Name == "Sales", ct);
             if (pipeline is null)

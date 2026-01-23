@@ -87,7 +87,7 @@ builder.Services.AddScoped(typeof(IPipelineBehavior<,>), typeof(PermissionBehavi
 // Tenant provider
 builder.Services.AddHttpContextAccessor();
 builder.Services.Configure<TenantOptions>(builder.Configuration.GetSection("Tenancy"));
-builder.Services.AddScoped<ITenantResolver, DefaultTenantResolver>();
+builder.Services.AddScoped<ITenantResolver, SubdomainTenantResolver>();
 builder.Services.AddScoped<ITenantProvider, HttpTenantProvider>();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 
@@ -443,8 +443,8 @@ if (app.Environment.IsDevelopment())
 app.UseCors();
 app.UseRateLimiter();
 
-app.UseAuthentication();
 app.UseMiddleware<TenantResolutionMiddleware>();
+app.UseAuthentication();
 app.UseAuthorization();
 
 // Consistent ProblemDetails for auth failures on API endpoints
@@ -530,7 +530,8 @@ app.MapPost("/auth/login", async (HttpContext ctx, IAntiforgery antiforgery, Use
 
     var claims = new List<Claim>
     {
-        new("tenant", resolution.TenantId.ToString())
+        new("tenant", resolution.TenantId.ToString()),
+        new("tenant_slug", resolution.TenantSlug ?? string.Empty)
     };
 
     if (!string.IsNullOrWhiteSpace(resolution.TenantName))
@@ -551,6 +552,7 @@ app.MapPost("/auth/login", async (HttpContext ctx, IAntiforgery antiforgery, Use
             identity.AddClaim(new Claim(ClaimTypes.Role, role));
         }
         identity.AddClaim(new Claim("tenant", resolution.TenantId.ToString()));
+        identity.AddClaim(new Claim("tenant_slug", resolution.TenantSlug ?? string.Empty));
         if (!string.IsNullOrWhiteSpace(resolution.TenantName))
         {
             identity.AddClaim(new Claim("tenant_name", resolution.TenantName));
@@ -628,7 +630,7 @@ app.MapPost("/api/auth/login", async (
         return Results.BadRequest("Tenant could not be resolved.");
     }
 
-    var res = tokens.CreateToken(user.Id, user.UserName!, resolution.TenantId);
+    var res = tokens.CreateToken(user.Id, user.UserName!, resolution.TenantId, resolution.TenantSlug ?? string.Empty);
     var hash = JwtTokenService.HashRefresh(res.RefreshToken);
     db.RefreshTokens.Add(new RefreshToken { Id = Guid.NewGuid(), UserId = user.Id, TokenHash = hash, ExpiresAtUtc = DateTime.UtcNow.AddDays(14) });
     await db.SaveChangesAsync();
@@ -659,7 +661,7 @@ app.MapPost("/api/auth/refresh", async (RefreshRequest req, UserManager<Identity
         return Results.BadRequest("Tenant could not be resolved.");
     }
 
-    var newToken = tokens.CreateToken(user.Id, user.UserName!, resolution.TenantId);
+    var newToken = tokens.CreateToken(user.Id, user.UserName!, resolution.TenantId, resolution.TenantSlug ?? string.Empty);
     var newHash = JwtTokenService.HashRefresh(newToken.RefreshToken);
     db.RefreshTokens.Add(new RefreshToken { Id = Guid.NewGuid(), UserId = user.Id, TokenHash = newHash, ExpiresAtUtc = DateTime.UtcNow.AddDays(14), ReplacedByHash = newHash });
     await db.SaveChangesAsync();

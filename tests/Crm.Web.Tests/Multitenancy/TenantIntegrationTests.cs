@@ -21,7 +21,8 @@ namespace Crm.Web.Tests.Multitenancy
     {
         private sealed class TestWebApplicationFactory : WebApplicationFactory<Program>
         {
-            public Guid DefaultTenantId { get; } = Guid.Parse("11111111-1111-1111-1111-111111111111");
+            public Guid Tenant1Id { get; } = Guid.Parse("11111111-1111-1111-1111-111111111111");
+            public Guid Tenant2Id { get; } = Guid.Parse("22222222-2222-2222-2222-222222222222");
             private readonly string _dbName = $"crm-test-{Guid.NewGuid()}";
 
             protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -32,8 +33,8 @@ namespace Crm.Web.Tests.Multitenancy
                 {
                     var settings = new Dictionary<string, string?>
                     {
-                        ["Tenancy:DefaultTenantId"] = DefaultTenantId.ToString(),
-                        ["Tenancy:DefaultTenantName"] = "Default",
+                        ["Tenancy:DefaultTenantSlug"] = "demo",
+                        ["Tenancy:DefaultTenantName"] = "Demo",
                         ["Jwt:Key"] = "TEST_KEY_01234567890123456789012345678901",
                         ["Jwt:Issuer"] = "BlazorCrm",
                         ["Jwt:Audience"] = "BlazorCrmClients"
@@ -50,19 +51,24 @@ namespace Crm.Web.Tests.Multitenancy
             }
         }
 
-        private static async Task SeedAsync(IServiceProvider services, Guid defaultTenantId)
+        private static async Task SeedAsync(IServiceProvider services, Guid tenant1Id, Guid tenant2Id)
         {
             using var scope = services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<CrmDbContext>();
             await db.Database.EnsureCreatedAsync();
 
-            if (!await db.Tenants.AnyAsync(t => t.Id == defaultTenantId))
+            if (!await db.Tenants.AnyAsync(t => t.Id == tenant1Id))
             {
-                db.Tenants.Add(new Tenant { Id = defaultTenantId, Name = "Default", Slug = "default" });
+                db.Tenants.Add(new Tenant { Id = tenant1Id, Name = "Tenant 1", Slug = "tenant1" });
             }
 
-            db.Companies.Add(new Company { Id = Guid.NewGuid(), Name = "DefaultCo", TenantId = defaultTenantId });
-            db.Companies.Add(new Company { Id = Guid.NewGuid(), Name = "OtherCo", TenantId = Guid.NewGuid() });
+            if (!await db.Tenants.AnyAsync(t => t.Id == tenant2Id))
+            {
+                db.Tenants.Add(new Tenant { Id = tenant2Id, Name = "Tenant 2", Slug = "tenant2" });
+            }
+
+            db.Companies.Add(new Company { Id = Guid.NewGuid(), Name = "Tenant1Co", TenantId = tenant1Id });
+            db.Companies.Add(new Company { Id = Guid.NewGuid(), Name = "Tenant2Co", TenantId = tenant2Id });
             await db.SaveChangesAsync();
 
             var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
@@ -92,13 +98,14 @@ namespace Crm.Web.Tests.Multitenancy
         public async Task CookieLogin_SetsTenantClaim_And_AllowsTenantScopedQueries()
         {
             var factory = new TestWebApplicationFactory();
-            await SeedAsync(factory.Services, factory.DefaultTenantId);
+            await SeedAsync(factory.Services, factory.Tenant1Id, factory.Tenant2Id);
 
             var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
                 AllowAutoRedirect = false,
                 HandleCookies = true
             });
+            client.DefaultRequestHeaders.Host = "tenant1.localhost";
 
             var token = await GetAntiforgeryTokenAsync(client);
             var form = new Dictionary<string, string>
@@ -123,9 +130,10 @@ namespace Crm.Web.Tests.Multitenancy
         public async Task JwtLogin_IncludesTenantClaim_And_QueryFiltersApply()
         {
             var factory = new TestWebApplicationFactory();
-            await SeedAsync(factory.Services, factory.DefaultTenantId);
+            await SeedAsync(factory.Services, factory.Tenant1Id, factory.Tenant2Id);
 
             var client = factory.CreateClient();
+            client.DefaultRequestHeaders.Host = "tenant1.localhost";
 
             var login = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest("admin@local", "Admin123$"));
             Assert.Equal(HttpStatusCode.OK, login.StatusCode);
@@ -137,7 +145,10 @@ namespace Crm.Web.Tests.Multitenancy
             var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token!);
             var tenantClaim = jwt.Claims.FirstOrDefault(c => c.Type == "tenant");
             Assert.NotNull(tenantClaim);
-            Assert.Equal(factory.DefaultTenantId.ToString(), tenantClaim!.Value);
+            Assert.Equal(factory.Tenant1Id.ToString(), tenantClaim!.Value);
+            var tenantSlug = jwt.Claims.FirstOrDefault(c => c.Type == "tenant_slug");
+            Assert.NotNull(tenantSlug);
+            Assert.Equal("tenant1", tenantSlug!.Value);
 
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             var res = await client.GetAsync("/api/companies?page=1&pageSize=50");
@@ -146,6 +157,19 @@ namespace Crm.Web.Tests.Multitenancy
             using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
             var total = doc.RootElement.GetProperty("total").GetInt32();
             Assert.Equal(1, total);
+        }
+
+        [Fact]
+        public async Task UnknownTenantHost_Returns404_When_No_Dev_Fallback()
+        {
+            var factory = new TestWebApplicationFactory();
+            await SeedAsync(factory.Services, factory.Tenant1Id, factory.Tenant2Id);
+
+            var client = factory.CreateClient();
+            client.DefaultRequestHeaders.Host = "unknown.localhost";
+
+            var res = await client.GetAsync("/api/companies?page=1&pageSize=50");
+            Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
         }
     }
 }

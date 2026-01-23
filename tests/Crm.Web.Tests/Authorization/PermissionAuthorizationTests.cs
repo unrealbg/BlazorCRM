@@ -30,8 +30,8 @@ namespace Crm.Web.Tests.Authorization
                 {
                     var settings = new Dictionary<string, string?>
                     {
-                        ["Tenancy:DefaultTenantId"] = DefaultTenantId.ToString(),
-                        ["Tenancy:DefaultTenantName"] = "Default",
+                        ["Tenancy:DefaultTenantSlug"] = "demo",
+                        ["Tenancy:DefaultTenantName"] = "Demo",
                         ["Jwt:Key"] = "TEST_KEY_01234567890123456789012345678901",
                         ["Jwt:Issuer"] = "BlazorCrm",
                         ["Jwt:Audience"] = "BlazorCrmClients"
@@ -56,7 +56,7 @@ namespace Crm.Web.Tests.Authorization
 
             if (!await db.Tenants.AnyAsync(t => t.Id == tenantId))
             {
-                db.Tenants.Add(new Tenant { Id = tenantId, Name = "Default", Slug = "default" });
+                db.Tenants.Add(new Tenant { Id = tenantId, Name = "Demo", Slug = "demo" });
                 await db.SaveChangesAsync();
             }
         }
@@ -105,6 +105,7 @@ namespace Crm.Web.Tests.Authorization
                 AllowAutoRedirect = false,
                 HandleCookies = true
             });
+            client.DefaultRequestHeaders.Host = "demo.localhost";
 
             var token = await GetAntiforgeryTokenAsync(client);
             var form = new Dictionary<string, string>
@@ -128,6 +129,7 @@ namespace Crm.Web.Tests.Authorization
             await SeedTenantAsync(factory.Services, factory.DefaultTenantId);
 
             var client = factory.CreateClient();
+            client.DefaultRequestHeaders.Host = "demo.localhost";
             var res = await client.PostAsJsonAsync("/api/companies", new { Name = "NoAuth" });
 
             Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
