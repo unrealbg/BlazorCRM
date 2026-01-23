@@ -20,7 +20,7 @@ namespace Crm.Infrastructure.Security
 
         public JwtTokenService(IConfiguration cfg) => _cfg = cfg;
 
-        public LoginResponse CreateToken(string userId, string userName, Guid tenantId)
+        public LoginResponse CreateToken(string userId, string userName, Guid tenantId, string tenantSlug)
         {
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_cfg["Jwt:Key"]!));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -30,7 +30,8 @@ namespace Crm.Infrastructure.Security
                              {
                                  new Claim(ClaimTypes.NameIdentifier, userId),
                                  new Claim(ClaimTypes.Name, userName),
-                                 new Claim("tenant", tenantId.ToString())
+                                 new Claim("tenant", tenantId.ToString()),
+                                 new Claim("tenant_slug", tenantSlug ?? string.Empty)
                              };
 
             var token = new JwtSecurityToken(
