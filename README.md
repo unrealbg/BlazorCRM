@@ -71,6 +71,7 @@ Notes:
 - In Development, if the connection string is missing, a dev fallback to local PostgreSQL is used.
 - On startup: EF migrations are applied, IdentitySeeder runs (roles/admin), DemoDataSeeder runs in Development only.
 - Data Protection keys are stored in the database.
+- Demo data seeding can be toggled with Seed:DemoData (true/false). In Development it defaults to true via appsettings.Development.json.
 
 ### Quartz schema (PostgreSQL)
 Quartz uses a persistent store. On first startup the app checks for Quartz tables and, if missing, looks for a SQL script and applies it automatically.
@@ -96,6 +97,7 @@ Default login (after seed):
 - Company/Contact have Tags (List<string>) with a custom ValueComparer and string conversion
 - Global TenantId filters applied to most tables
 - Useful indexes for common queries (e.g., Deal: StageId/OwnerId/CompanyId/ContactId; Activity/TaskItem: RelatedId; etc.)
+- Unified search uses PostgreSQL FTS with stored tsvector columns and GIN indexes. Migration 20260120000000_AddSearchVectors adds unaccent/pg_trgm extensions.
 
 Manual EF commands:
 - Add migration: `dotnet ef migrations add <Name> -p src/Crm.Infrastructure -s src/Presentation/Crm.Web`
@@ -106,6 +108,7 @@ Manual EF commands:
 - Policies/Permissions: see Crm.Application.Security.Permissions and Program.cs
 - Roles: Admin/Manager/User (seeded)
 - Multi-tenancy: ITenantProvider (HttpTenantProvider) reads claim "tenant"; defaults to Guid.Empty when missing
+- Antiforgery: HTML form endpoints (/auth/login and /auth/logout) validate antiforgery tokens. The Blazor forms include <AntiforgeryToken /> inside the form body (not in <head>).
 
 ## API (v1) — endpoints and examples
 All /api routes are protected and use CORS policy "maui" and fixed-window rate limiting (60 req/min). Use Bearer <accessToken> for protected routes.
