@@ -5,13 +5,13 @@ A compact but complete CRM sample built with Blazor Server, EF Core (PostgreSQL)
 The solution demonstrates real-world practices: CQRS via MediatR, multi-tenancy, caching, rate limiting, telemetry, and background jobs.
 
 ## Solution layout
-- src/Crm.Domain — domain models and enums
-- src/Crm.Application — application layer (CQRS/MediatR, interfaces, validation, permissions)
-- src/Crm.Infrastructure — infrastructure (EF Core DbContext, migrations, Identity, services, Quartz, SignalR hub)
-- src/Presentation/Crm.Web — Blazor Server app + minimal APIs
-- src/Presentation/Crm.UI — shared Blazor UI components
-- src/Background/Crm.Worker — .NET Worker (BackgroundService)
-- tests/* — test projects
+- src/Crm.Domain - domain models and enums
+- src/Crm.Application - application layer (CQRS/MediatR, interfaces, validation, permissions)
+- src/Crm.Infrastructure - infrastructure (EF Core DbContext, migrations, Identity, services, Quartz, SignalR hub)
+- src/Presentation/Crm.Web - Blazor Server app + minimal APIs
+- src/Presentation/Crm.UI - shared Blazor UI components
+- src/Background/Crm.Worker - .NET Worker (BackgroundService)
+- tests/* - test projects
 
 ## Features
 - Blazor Server UI: Companies, Contacts, Deals, Tasks, Activities, Dashboard and details pages
@@ -38,11 +38,11 @@ The solution demonstrates real-world practices: CQRS via MediatR, multi-tenancy,
 - PostgreSQL database (local or container)
 
 ### Configuration (appsettings.*)
-- ConnectionStrings:DefaultConnection — Npgsql connection string
-- Jwt:Key, Jwt:Issuer, Jwt:Audience — JWT settings
-- Cors:AllowedOrigins — CORS origins for policy "maui"
-- Seed:AdminEmail / Seed:AdminPassword / Seed:AdminRoles — initial user and roles
-- Quartz:SchemaSqlPath — optional path to the Quartz SQL schema script
+- ConnectionStrings:DefaultConnection - Npgsql connection string
+- Jwt:Key, Jwt:Issuer, Jwt:Audience - JWT settings
+- Cors:AllowedOrigins - CORS origins for policy "maui"
+- Seed:AdminEmail / Seed:AdminPassword / Seed:AdminRoles - initial user and roles
+- Quartz:SchemaSqlPath - optional path to the Quartz SQL schema script
 
 Example (appsettings.Development.json):
 ```json
@@ -68,6 +68,7 @@ Notes:
 - In Development, if the connection string is missing, a dev fallback to local PostgreSQL is used.
 - On startup: EF migrations are applied, IdentitySeeder runs (roles/admin), DemoDataSeeder runs in Development only.
 - Data Protection keys are stored in the database.
+- Demo data seeding can be toggled with Seed:DemoData (true/false). In Development it defaults to true via appsettings.Development.json.
 
 ### Quartz schema (PostgreSQL)
 Quartz uses a persistent store. On first startup the app checks for Quartz tables and, if missing, looks for a SQL script and applies it automatically.
@@ -93,6 +94,7 @@ Default login (after seed):
 - Company/Contact have Tags (List<string>) with a custom ValueComparer and string conversion
 - Global TenantId filters applied to most tables
 - Useful indexes for common queries (e.g., Deal: StageId/OwnerId/CompanyId/ContactId; Activity/TaskItem: RelatedId; etc.)
+- Unified search uses PostgreSQL FTS with stored tsvector columns and GIN indexes. Migration 20260120000000_AddSearchVectors adds unaccent/pg_trgm extensions.
 
 Manual EF commands:
 - Add migration: `dotnet ef migrations add <Name> -p src/Crm.Infrastructure -s src/Presentation/Crm.Web`
@@ -103,14 +105,18 @@ Manual EF commands:
 - Policies/Permissions: see Crm.Application.Security.Permissions and Program.cs
 - Roles: Admin/Manager/User (seeded)
 - Multi-tenancy: ITenantProvider (HttpTenantProvider) reads claim "tenant"; defaults to Guid.Empty when missing
+- Antiforgery: HTML form endpoints (/auth/login and /auth/logout) validate antiforgery tokens. The Blazor forms include <AntiforgeryToken /> inside the form body (not in <head>).
 
-## API (v1) — endpoints and examples
+## API (v1) - endpoints and examples
 All /api routes are protected and use CORS policy "maui" and fixed-window rate limiting (60 req/min). Use Bearer <accessToken> for protected routes.
 
 Auth
-- POST /api/auth/login — issue JWT + refresh token
-- POST /api/auth/refresh — rotate refresh token
-- POST /api/auth/logout — revoke refresh token(s)
+- POST /api/auth/login - issue JWT + refresh token
+- POST /api/auth/refresh - rotate refresh token
+- POST /api/auth/logout - revoke refresh token(s)
+
+Search
+- GET /api/search?q=term - unified search across companies, contacts, deals
 
 Example: login (JWT)
 ```bash
@@ -146,11 +152,11 @@ curl -X POST https://localhost:5001/api/auth/logout \
 ```
 
 Companies
-- GET /api/companies — search/filter/sort/pagination
-- POST /api/companies — create
-- PUT /api/companies/{id} — update
-- DELETE /api/companies/{id} — delete
-- GET /api/companies/industries — distinct industries
+- GET /api/companies - search/filter/sort/pagination
+- POST /api/companies - create
+- PUT /api/companies/{id} - update
+- DELETE /api/companies/{id} - delete
+- GET /api/companies/industries - distinct industries
 
 Example: list companies with filter/sort/paging
 ```bash
@@ -206,7 +212,7 @@ Tasks
 - POST /api/tasks, PUT /api/tasks/{id}, DELETE /api/tasks/{id}
 
 Attachments
-- GET /attachments/{id} — download attachment
+- GET /attachments/{id} - download attachment
 
 Example: download attachment
 ```bash
@@ -218,7 +224,7 @@ Health
 - GET /health/live, GET /health/ready
 
 Form login (web)
-- POST /auth/login — Cookie sign-in for Blazor UI form
+- POST /auth/login - Cookie sign-in for Blazor UI form
 
 ## Telemetry
 - OpenTelemetry tracing and metrics (ASP.NET Core, HttpClient, EF Core) with OTLP exporter.
