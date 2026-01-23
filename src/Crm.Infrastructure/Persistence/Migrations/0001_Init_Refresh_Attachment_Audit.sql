@@ -15,11 +15,17 @@ END $$;
 CREATE TABLE IF NOT EXISTS "RefreshTokens" (
     "Id" uuid PRIMARY KEY,
     "UserId" text NOT NULL,
+    "TenantId" uuid NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
     "TokenHash" text NOT NULL,
     "ExpiresAtUtc" timestamp with time zone NOT NULL,
     "IsRevoked" boolean NOT NULL DEFAULT false,
     "ReplacedByHash" text NULL,
-    "CreatedAtUtc" timestamp with time zone NOT NULL
+    "CreatedAtUtc" timestamp with time zone NOT NULL,
+    "RevokedAtUtc" timestamp with time zone NULL,
+    "CreatedByIp" text NULL,
+    "RevokedByIp" text NULL,
+    "UserAgent" text NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS ix_refreshtokens_user_token ON "RefreshTokens"("UserId","TokenHash");
+CREATE INDEX IF NOT EXISTS ix_refreshtokens_user_tenant_revoked ON "RefreshTokens"("UserId","TenantId","IsRevoked");
 CREATE INDEX IF NOT EXISTS ix_refreshtokens_expires ON "RefreshTokens"("ExpiresAtUtc");
