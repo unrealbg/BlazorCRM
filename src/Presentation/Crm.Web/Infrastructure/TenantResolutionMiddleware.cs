@@ -19,6 +19,9 @@ namespace Crm.Web.Infrastructure
                 return;
             }
 
+            var cacheKey = resolution.TenantSlug ?? resolution.TenantId.ToString("N");
+            ctx.Request.Headers["X-Tenant"] = cacheKey;
+
             await _next(ctx);
         }
     }

@@ -284,10 +284,12 @@ builder.Services.AddOutputCache(o =>
 {
     o.AddPolicy("companies", b => b
         .Expire(TimeSpan.FromSeconds(30))
-        .SetVaryByQuery("search", "industry", "sort", "asc", "page", "pageSize"));
+        .SetVaryByQuery("search", "industry", "sort", "asc", "page", "pageSize")
+        .SetVaryByHeader("X-Tenant"));
     o.AddPolicy("industries", b => b
         .Expire(TimeSpan.FromMinutes(5))
-        .SetVaryByQuery("search"));
+        .SetVaryByQuery("search")
+        .SetVaryByHeader("X-Tenant"));
 });
 
 // EF-backed services
@@ -425,8 +427,11 @@ app.UseSerilogRequestLogging();
 // Compression
 app.UseResponseCompression();
 
+app.UseMiddleware<TenantResolutionMiddleware>();
+
 // Output cache
-if (!app.Environment.IsEnvironment("Testing"))
+var enableOutputCache = !app.Environment.IsEnvironment("Testing") || app.Configuration.GetValue<bool>("OutputCache:EnableInTesting");
+if (enableOutputCache)
 {
     app.UseOutputCache();
 }
