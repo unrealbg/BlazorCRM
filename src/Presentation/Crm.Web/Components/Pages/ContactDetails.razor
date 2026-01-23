@@ -1,0 +1,86 @@
+@page "/contacts/{Id:guid}"
+@using Crm.Application.Services
+@using Crm.Domain.Entities
+@using Crm.Domain.Enums
+@using Crm.Application.Security
+
+<h1 class="text-2xl font-semibold mb-4">Contact details</h1>
+
+<div class="grid lg:grid-cols-3 gap-4">
+  <div class="card p-4 lg:col-span-2">
+    @if (_loading)
+    {
+      <div>Loading...</div>
+    }
+    else if (_contact is null)
+    {
+      <div class="text-slate-500">Not found</div>
+    }
+    else
+    {
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="text-xl font-semibold">@_contact.FirstName @_contact.LastName</div>
+          <AuthorizeView Policy="@Permissions.Contacts_Write">
+            <Authorized Context="auth">
+              <button class="btn btn-muted" @onclick="() => _editModal.Show()">Edit</button>
+            </Authorized>
+          </AuthorizeView>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(_contact.Email)) 
+        { 
+            <div class="text-slate-500">Email: @_contact.Email</div> 
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_contact.Phone)) 
+        { 
+            <div class="text-slate-500">Phone: @_contact.Phone</div> 
+        
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_contact.Position)) 
+        { 
+            <div class="text-slate-500">Position: @_contact.Position</div> 
+        }
+
+        @if (_contact.Tags?.Count > 0)
+        {
+          <div class="text-slate-500">Tags: @string.Join(", ", _contact.Tags)</div>
+        }
+      </div>
+    }
+  </div>
+
+  <div class="card p-4">
+    <div class="font-semibold mb-2">Activities</div>
+    <ActivitiesList RelatedTo="RelatedToType.Contact" RelatedId="Id" />
+  </div>
+</div>
+
+<AuthorizeView Policy="@Permissions.Contacts_Write">
+  <Authorized Context="auth2">
+    <Modal @ref="_editModal" Title="Edit contact">
+      @if (_contact is not null)
+      {
+        <EditForm Model="_contact" OnValidSubmit="SaveAsync">
+          <DataAnnotationsValidator />
+          <div class="space-y-2">
+            <div class="grid grid-cols-2 gap-2">
+              <input class="input" @bind="_contact.FirstName" />
+              <input class="input" @bind="_contact.LastName" />
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <input class="input" @bind="_contact.Email" />
+              <input class="input" @bind="_contact.Phone" />
+            </div>
+            <input class="input" @bind="_contact.Position" />
+            <div class="flex justify-end gap-2">
+              <button type="button" class="btn btn-muted" @onclick="() => _editModal.Hide()">Cancel</button>
+              <button class="btn btn-primary">Save</button>
+            </div>
+          </div>
+        </EditForm>
+      }
+    </Modal>
+  </Authorized>
+</AuthorizeView>

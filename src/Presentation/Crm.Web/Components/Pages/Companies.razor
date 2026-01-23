@@ -1,0 +1,113 @@
+@page "/companies"
+@implements IAsyncDisposable
+@using MediatR
+@using Crm.Application.Common.Models
+@using Crm.Application.Companies.Queries
+@using System.Text.Json
+
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+  <div>
+    <h1 class="text-2xl font-semibold">Companies</h1>
+    <div class="text-xs text-slate-500">Manage accounts, filters, and saved views.</div>
+  </div>
+  <div class="flex items-center gap-2">
+    <UiButton Variant="primary" OnClick="ShowQuickCreate">+ New Company</UiButton>
+    <label class="ui-btn ui-btn-muted cursor-pointer">Import CSV<input type="file" class="hidden" /></label>
+  </div>
+</div>
+
+<UiCard Class="p-4 mb-4">
+  <div class="flex flex-wrap items-center gap-2">
+    <div class="min-w-[220px] flex-1">
+      <UiInput @bind-Value="_search" Placeholder="Search companies..." />
+    </div>
+    <div class="w-56">
+      <UiSelect @bind-Value="_industry">
+        <option value="">All industries</option>
+        @foreach (var ind in _industries)
+        {
+          <option value="@ind">@ind</option>
+        }
+      </UiSelect>
+    </div>
+    <div class="w-36">
+      <InputSelect class="ui-select" @bind-Value="_pageSize">
+        <option value="5">5 / page</option>
+        <option value="10">10 / page</option>
+        <option value="20">20 / page</option>
+      </InputSelect>
+    </div>
+    <UiButton Variant="muted" OnClick="ApplyFilters">Apply</UiButton>
+    <UiButton Variant="muted" OnClick="ClearFilters">Clear</UiButton>
+    <div class="ml-auto text-xs text-slate-500">@(_total) results</div>
+  </div>
+
+  <div class="mt-3 flex flex-wrap items-center gap-2">
+    <span class="text-[11px] uppercase tracking-wide text-slate-500">Saved views</span>
+    <InputSelect class="ui-select w-48" @bind-Value="_selectedView" @onchange="OnViewChanged">
+      <option value="">Select view</option>
+      @foreach (var view in _views)
+      {
+        <option value="@view.Name">@view.Name</option>
+      }
+    </InputSelect>
+    <UiInput Class="w-56" @bind-Value="_newViewName" Placeholder="Save current view as..." />
+    <UiButton Variant="muted" OnClick="SaveView">Save view</UiButton>
+  </div>
+</UiCard>
+
+<UiCard Class="p-0 overflow-x-auto">
+  <UiTable Class="min-w-full text-sm">
+    <thead class="bg-white/50 dark:bg-slate-800/40">
+      <tr class="text-slate-600 dark:text-slate-300">
+        <th class="px-4 py-3 text-left cursor-pointer" @onclick="() => SortBy(nameof(Crm.Domain.Entities.Company.Name))">Company @SortGlyph(nameof(Crm.Domain.Entities.Company.Name))</th>
+        <th class="px-4 py-3 text-left cursor-pointer" @onclick="() => SortBy(nameof(Crm.Domain.Entities.Company.Industry))">Industry @SortGlyph(nameof(Crm.Domain.Entities.Company.Industry))</th>
+        <th class="px-4 py-3 text-right">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      @if (_loading)
+      {
+        @for (var i = 0; i < 5; i++)
+        {
+          <tr class="border-t border-white/40 dark:border-white/10">
+            <td class="px-4 py-3"><UiSkeleton Style="height:14px;width:160px" /></td>
+            <td class="px-4 py-3"><UiSkeleton Style="height:14px;width:120px" /></td>
+            <td class="px-4 py-3 text-right"><UiSkeleton Style="height:14px;width:80px;display:inline-block" /></td>
+          </tr>
+        }
+      }
+      else if (!_items.Any())
+      {
+        <tr><td class="px-4 py-6" colspan="3"><UiEmptyState Title="No companies" Description="Try adjusting your filters or create a new company." /></td></tr>
+      }
+      else
+      {
+        @foreach (var c in _items)
+        {
+          <tr class="border-t border-white/40 dark:border-white/10">
+            <td class="px-4 py-3 font-medium">@c.Name</td>
+            <td class="px-4 py-3">@c.Industry</td>
+            <td class="px-4 py-3 text-right">
+              <button class="link" @onclick="() => View(c.Id)">View</button>
+              <button class="link" @onclick="() => Edit(c.Id)">Edit</button>
+            </td>
+          </tr>
+        }
+      }
+    </tbody>
+  </UiTable>
+</UiCard>
+
+@if (_pages > 1)
+{
+  <div class="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
+    <div>Showing @StartRow-@EndRow of @_total</div>
+    <div class="inline-flex gap-2">
+      <UiButton Variant="muted" Disabled="@(_page==1)" OnClick="PrevPage">Prev</UiButton>
+      <UiButton Variant="muted" Disabled="@(_page==_pages)" OnClick="NextPage">Next</UiButton>
+    </div>
+  </div>
+}
+
+

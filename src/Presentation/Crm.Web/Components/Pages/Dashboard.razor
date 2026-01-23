@@ -1,0 +1,44 @@
+@page "/"
+
+<h1 class="text-2xl lg:text-[26px] font-semibold tracking-tight mb-4">Dashboard</h1>
+
+<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+  <div class="card p-4">
+    <div class="text-sm text-slate-500">Revenue (Won) - this month</div>
+    <div class="mt-1 text-2xl lg:text-3xl font-semibold">$ 48,300</div>
+    <div class="mt-1 text-xs"><span class="text-emerald-600">? 12%</span> vs last month</div>
+  </div>
+  <div class="card p-4">
+    <div class="text-sm text-slate-500">Conversion rate</div>
+    <div class="mt-1 text-2xl lg:text-3xl font-semibold">24.5%</div>
+    <div class="mt-1 text-xs text-slate-500">90-day average</div>
+  </div>
+  <div class="card p-4">
+    <div class="text-sm text-slate-500">Open deals</div>
+    <div class="mt-1 text-2xl lg:text-3xl font-semibold">128</div>
+    <div class="mt-1 text-xs text-slate-500">12 at <span class="chip">Proposal</span></div>
+  </div>
+  <div class="card p-4">
+    <div class="text-sm text-slate-500">Activities due (24h)</div>
+    <div class="mt-1 text-2xl lg:text-3xl font-semibold">9</div>
+    <div class="mt-1 text-xs text-slate-500">3 Calls - 2 Meetings - 4 Emails</div>
+  </div>
+</div>
+
+<div class="mt-6 grid gap-6 lg:grid-cols-3">
+  <div class="card p-4 lg:col-span-2">
+    <div class="flex items-center justify-between mb-2">
+      <div class="font-medium">Revenue by month</div>
+      <div class="text-xs text-slate-500">Last 12m</div>
+    </div>
+    <div class="h-56 rounded-xl bg-gradient-to-b from-white/60 to-white/20 dark:from-slate-800/40 dark:to-slate-800/10 border border-white/40 dark:border-white/10"></div>
+  </div>
+  <div class="card p-4">
+    <div class="font-medium mb-2">Top owners</div>
+    <ul class="divide-y divide-white/40 dark:divide-white/10">
+      <li class="flex items-center justify-between py-3"><span class="inline-flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>Jennifer</span><span class="font-semibold">$ 22,400</span></li>
+      <li class="flex items-center justify-between py-3"><span class="inline-flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full bg-sky-500"></span>Ivan</span><span class="font-semibold">$ 17,900</span></li>
+      <li class="flex items-center justify-between py-3"><span class="inline-flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full bg-fuchsia-500"></span>Maria</span><span class="font-semibold">$ 12,100</span></li>
+    </ul>
+  </div>
+</div>

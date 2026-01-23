@@ -1,0 +1,16 @@
+@using Microsoft.AspNetCore.Components
+
+<div class="d-flex align-items-center gap-2">
+    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width:40px;height:40px;">
+        @Initials
+    </div>
+    <div>
+        <div class="h5 m-0">@Title</div>
+        @if (!string.IsNullOrWhiteSpace(Subtitle))
+        {
+            <div class="text-muted small">@Subtitle</div>
+        }
+    </div>
+</div>
+
+

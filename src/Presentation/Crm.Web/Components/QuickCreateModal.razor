@@ -1,0 +1,42 @@
+@using MediatR
+@using Crm.Application.Companies
+@rendermode InteractiveServer
+
+<div id="modalQuickCreate" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/40" @onclick="Hide"></div>
+  <div class="relative mx-auto mt-20 w-full max-w-xl card p-4">
+    <div class="flex items-center justify-between pb-2 border-b border-white/30 dark:border-white/10">
+      <h2 class="text-lg font-semibold">Quick Create</h2>
+      <button type="button" class="h-8 w-8 rounded-lg hover:bg-white/60 dark:hover:bg-slate-700/50 inline-flex items-center justify-center" @onclick="Hide" aria-label="Close">
+        <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 6l12 12"></path>
+          <path d="M18 6l-12 12"></path>
+        </svg>
+      </button>
+    </div>
+
+    <EditForm Model="this" OnValidSubmit="Create">
+      <DataAnnotationsValidator />
+      <div class="py-4 space-y-3">
+        <div>
+          <label class="text-sm block mb-1">Type</label>
+          <select class="select" @bind="Type">
+            <option value="Company">Company</option>
+            <option value="Contact">Contact (soon)</option>
+            <option value="Deal">Deal (soon)</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm block mb-1">Title/Name</label>
+          <input class="input" @bind="Title" required />
+        </div>
+      </div>
+      <div class="pt-2 border-t border-white/30 dark:border-white/10 flex justify-end gap-2">
+        <button type="button" class="btn btn-muted" @onclick="Hide">Cancel</button>
+        <button type="submit" class="btn btn-primary" disabled="@_busy">@(_busy ? "Working..." : "Create")</button>
+      </div>
+    </EditForm>
+  </div>
+</div>
+
+

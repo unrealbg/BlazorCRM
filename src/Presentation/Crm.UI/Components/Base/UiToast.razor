@@ -1,0 +1,13 @@
+<div class="ui-card flex items-start gap-3 border-l-4 px-3 py-2 @ToneClass @Class" @attributes="AdditionalAttributes">
+  <div class="text-sm font-semibold text-slate-700 dark:text-slate-100">@Title</div>
+  @if (!string.IsNullOrWhiteSpace(Message))
+  {
+    <div class="text-xs text-slate-500 dark:text-slate-300">@Message</div>
+  }
+  @if (ChildContent is not null)
+  {
+    <div class="text-xs">@ChildContent</div>
+  }
+</div>
+
+

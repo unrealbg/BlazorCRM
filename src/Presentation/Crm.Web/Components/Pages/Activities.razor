@@ -1,0 +1,22 @@
+@page "/activities"
+@using Crm.UI.Components
+@using Crm.Application.Services
+
+<h1 class="text-2xl font-semibold mb-4">Activities</h1>
+
+<div class="card p-4">
+  @if (_loading)
+  {
+    <div>Loading...</div>
+  }
+  else if (!_items.Any())
+  {
+    <div class="text-slate-500">No activities</div>
+  }
+  else
+  {
+    <ActivityTimeline Items="_items" />
+  }
+</div>
+
+

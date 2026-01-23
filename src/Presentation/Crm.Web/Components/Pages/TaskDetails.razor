@@ -1,0 +1,67 @@
+@page "/tasks/{Id:guid}"
+@using Crm.Application.Services
+@using Crm.Domain.Entities
+@using Crm.Domain.Enums
+@using TaskStatusDomain = Crm.Domain.Enums.TaskStatus
+@using Microsoft.AspNetCore.Components.Forms
+
+<h1 class="text-2xl font-semibold mb-4">Task details</h1>
+
+<div class="card p-4">
+  @if (_loading)
+  {
+    <div>Loading...</div>
+  }
+  else if (_task is null)
+  {
+    <div class="text-slate-500">Not found</div>
+  }
+  else
+  {
+    <div class="space-y-2">
+      <div class="flex items-center justify-between">
+        <div class="text-xl font-semibold">@_task.Title</div>
+        <button class="btn btn-muted" @onclick="() => _editModal.Show()">Edit</button>
+      </div>
+      @if (_task.DueAt is not null)
+      {
+        <div class="text-slate-500">Due: @_task.DueAt.Value.ToLocalTime().ToString("g")</div>
+      }
+      <div class="text-slate-500">Priority: @_task.Priority</div>
+      <div class="text-slate-500">Status: @_task.Status</div>
+    </div>
+  }
+</div>
+
+<Modal @ref="_editModal" Title="Edit task">
+  @if (_task is not null)
+  {
+    <EditForm Model="_task" OnValidSubmit="SaveAsync">
+      <DataAnnotationsValidator />
+      <div class="space-y-2">
+        <input class="input" @bind="_task.Title" />
+        <div class="grid grid-cols-3 gap-2">
+          <input class="input" type="datetime-local" @bind-value="_dueLocal" @bind-value:event="oninput" />
+          <select class="select" @bind="_task.Priority">
+            @foreach (var p in Enum.GetValues<TaskPriority>())
+            {
+              <option value="@p.ToString()">@p</option>
+            }
+          </select>
+          <select class="select" @bind="_status">
+            @foreach (var s in Enum.GetValues<TaskStatusDomain>())
+            {
+              <option value="@s.ToString()">@s</option>
+            }
+          </select>
+        </div>
+        <div class="flex justify-end gap-2">
+          <button type="button" class="btn btn-muted" @onclick="() => _editModal.Hide()">Cancel</button>
+          <button class="btn btn-primary">Save</button>
+        </div>
+      </div>
+    </EditForm>
+  }
+</Modal>
+
+

@@ -1,0 +1,20 @@
+<div class="fixed inset-0 z-50 @(Open ? string.Empty : "hidden")">
+  <div class="absolute inset-0 bg-black/40" @onclick="Close"></div>
+  <div class="relative mx-auto mt-20 w-full max-w-xl ui-card p-4">
+    <div class="flex items-center justify-between pb-2 border-b border-white/30 dark:border-white/10">
+      <h2 class="text-lg font-semibold">@Title</h2>
+      <button class="h-8 w-8 rounded-lg hover:bg-white/60 dark:hover:bg-slate-700/50" @onclick="Close">✕</button>
+    </div>
+    <div class="py-4">
+      @ChildContent
+    </div>
+    @if (Footer is not null)
+    {
+      <div class="pt-2 border-t border-white/30 dark:border-white/10">
+        @Footer
+      </div>
+    }
+  </div>
+</div>
+
+

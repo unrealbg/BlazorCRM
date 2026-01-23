@@ -1,0 +1,13 @@
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Web
+
+<div class="@($"p-2 border rounded {Class}")" aria-label="Stage column" @attributes="AdditionalAttributes"
+     @ondrop="OnDrop" @ondrop:preventDefault
+     @ondragover="OnDragOver" @ondragover:preventDefault
+     @ondragenter="OnDragEnter" @ondragleave="OnDragLeave">
+    <div class="fw-semibold">@Title (@Count)</div>
+    <hr />
+    @ChildContent
+</div>
+
+

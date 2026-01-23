@@ -1,0 +1,11 @@
+@using Microsoft.AspNetCore.Components.Forms
+
+<div class="p-3">
+    <h6>Upload CSV file</h6>
+    <InputFile OnChange="OnFileChange" Accept=".csv" />
+    <div class="mt-2">
+        <button class="btn btn-secondary" @onclick="Cancel">Close</button>
+    </div>
+</div>
+
+

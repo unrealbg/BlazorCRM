@@ -1,0 +1,9 @@
+<div class="card p-3" aria-label="Deal card">
+    <div class="text-sm font-medium">@Title</div>
+    @if (Amount.HasValue)
+    {
+        <div class="text-xs text-slate-500">@Amount.Value.ToString("C0")</div>
+    }
+</div>
+
+

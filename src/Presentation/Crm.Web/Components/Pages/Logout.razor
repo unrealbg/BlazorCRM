@@ -1,0 +1,15 @@
+@page "/logout"
+@attribute [AllowAnonymous]
+
+<div class="max-w-xl mx-auto card p-4 mt-20">
+    <h2 class="text-lg font-semibold mb-2">Sign out</h2>
+    <p class="text-sm text-slate-500 mb-4">Confirm sign out to end your session.</p>
+
+    <form method="post" action="/auth/logout">
+        <AntiforgeryToken />
+        <div class="flex items-center gap-2">
+            <button type="submit" class="btn btn-primary">Sign out</button>
+            <a class="btn btn-muted" href="/">Cancel</a>
+        </div>
+    </form>
+</div>
