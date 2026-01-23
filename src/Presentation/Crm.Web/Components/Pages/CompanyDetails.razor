@@ -1,0 +1,70 @@
+@page "/companies/{Id:guid}"
+@using Crm.Application.Services
+@using Crm.Domain.Entities
+@using Crm.Domain.Enums
+@using Crm.Application.Security
+
+<h1 class="text-2xl font-semibold mb-4">Company details</h1>
+
+<div class="grid lg:grid-cols-3 gap-4">
+  <div class="card p-4 lg:col-span-2">
+    @if (_loading)
+    {
+      <div>Loading...</div>
+    }
+    else if (_company is null)
+    {
+      <div class="text-slate-500">Not found</div>
+    }
+    else
+    {
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="text-xl font-semibold">@_company.Name</div>
+          <AuthorizeView Policy="@Permissions.Companies_Write">
+            <Authorized Context="auth">
+              <button class="btn btn-muted" @onclick="() => _editModal.Show()">Edit</button>
+            </Authorized>
+          </AuthorizeView>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(_company.Industry)) { <div class="text-slate-500">Industry: @_company.Industry</div> }
+        @if (!string.IsNullOrWhiteSpace(_company.Address)) { <div class="text-slate-500">Address: @_company.Address</div> }
+        @if (_company.Tags?.Count > 0)
+        {
+          <div class="text-slate-500">Tags: @string.Join(", ", _company.Tags)</div>
+        }
+      </div>
+    }
+  </div>
+
+  <div class="card p-4">
+    <div class="font-semibold mb-2">Activities</div>
+    <ActivitiesList RelatedTo="RelatedToType.Company" RelatedId="Id" />
+  </div>
+</div>
+
+<AuthorizeView Policy="@Permissions.Companies_Write">
+  <Authorized Context="auth2">
+    <Modal @ref="_editModal" Title="Edit company">
+      @if (_company is not null)
+      {
+        <EditForm Model="_company" OnValidSubmit="SaveAsync">
+          <DataAnnotationsValidator />
+          <div class="space-y-2">
+            <input class="input" @bind="_company.Name" />
+            <div class="grid grid-cols-2 gap-2">
+              <input class="input" @bind="_company.Industry" />
+              <input class="input" @bind="_company.Address" />
+            </div>
+            <div class="flex justify-end gap-2">
+              <button type="button" class="btn btn-muted" @onclick="() => _editModal.Hide()">Cancel</button>
+              <button class="btn btn-primary">Save</button>
+            </div>
+          </div>
+        </EditForm>
+      }
+    </Modal>
+  </Authorized>
+</AuthorizeView>
+
+

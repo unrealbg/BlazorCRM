@@ -1,0 +1,141 @@
+@page "/deals"
+@using Crm.Application.Services
+@using Crm.Domain.Entities
+@using Crm.UI.Components
+@using Crm.UI.Components.Base
+@using Crm.Application.Security
+
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+  <div>
+    <h1 class="text-2xl font-semibold">Deals</h1>
+    <div class="text-xs text-slate-500">Drag and drop across stages or open a deal to edit.</div>
+  </div>
+  <UiButton Variant="primary" OnClick="Reload">Refresh</UiButton>
+</div>
+
+<UiCard Class="p-4 space-y-3">
+  <div class="flex flex-wrap items-center gap-2">
+    <label class="text-xs uppercase tracking-wide text-slate-500">Pipeline</label>
+    <InputSelect class="ui-select w-60" @bind-Value="SelectedPipelineId">
+      @foreach (var p in _pipelines)
+      {
+        <option value="@p.Id">@p.Name</option>
+      }
+    </InputSelect>
+    <UiButton Variant="muted" OnClick="Reload">Reload</UiButton>
+  </div>
+
+  @if (_loading)
+  {
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+      @for (var i = 0; i < 4; i++)
+      {
+        <UiCard Class="p-3">
+          <UiSkeleton Style="height:14px;width:120px" />
+          <div class="mt-2 space-y-2">
+            <UiSkeleton Style="height:48px" />
+            <UiSkeleton Style="height:48px" />
+          </div>
+        </UiCard>
+      }
+    </div>
+  }
+  else if (_stages.Count == 0)
+  {
+    <UiEmptyState Title="No stages" Description="This pipeline has no stages yet." />
+  }
+  else
+  {
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+      @foreach (var s in _stages)
+      {
+        var list = _dealsByStage.TryGetValue(s.Id, out var v) ? v : new List<Deal>();
+        var hovered = _hoveredStageId == s.Id;
+        <StageColumn Title="@s.Name" Count="@list.Count" Class="@(hovered ? "ring-2 ring-brand-500/50" : null)" OnDrop="e => OnDropAsync(s.Id)" OnDragOver="OnDragOver" OnDragEnter="e => OnDragEnter(s.Id)" OnDragLeave="e => OnDragLeave(s.Id)">
+          <div class="space-y-2 min-h-10">
+            @foreach (var d in list)
+            {
+              var isGhost = _ghostDealId == d.Id;
+              <AuthorizeView Policy="@Permissions.Deals_Move">
+                <Authorized Context="auth">
+                  <div class="ui-card p-3 transition-opacity cursor-pointer" style="opacity:@(isGhost ? 0.5 : 1)" draggable="true" @ondragstart="e => OnDragStart(d)" @onclick="() => OpenDrawer(d)">
+                    <div class="font-medium truncate">@d.Title</div>
+                    <div class="text-xs text-slate-500">@d.Amount.ToString("C0") @if(!string.IsNullOrEmpty(d.Currency)){<span class="ml-1">@d.Currency</span>}</div>
+                  </div>
+                </Authorized>
+                <NotAuthorized>
+                  <div class="ui-card p-3 cursor-pointer" @onclick="() => OpenDrawer(d)">
+                    <div class="font-medium truncate">@d.Title</div>
+                    <div class="text-xs text-slate-500">@d.Amount.ToString("C0") @if(!string.IsNullOrEmpty(d.Currency)){<span class="ml-1">@d.Currency</span>}</div>
+                  </div>
+                </NotAuthorized>
+              </AuthorizeView>
+            }
+          </div>
+        </StageColumn>
+      }
+    </div>
+  }
+</UiCard>
+
+<UiDrawer @bind-Open="_drawerOpen" Title="Deal quick edit">
+  @if (_drawerDeal is null)
+  {
+    <UiEmptyState Title="No deal selected" Description="Select a deal card to view details." />
+  }
+  else
+  {
+    <div class="space-y-4">
+      <UiCard Class="p-3">
+        <div class="text-sm font-semibold">@_drawerDeal.Title</div>
+        <div class="text-xs text-slate-500">@_drawerDeal.Amount.ToString("C0") @_drawerDeal.Currency</div>
+        <div class="mt-2"><UiBadge>@(_stageNameMap.TryGetValue(_drawerDeal.StageId, out var sname) ? sname : "Stage")</UiBadge></div>
+      </UiCard>
+
+      <AuthorizeView Policy="@Permissions.Deals_Write">
+        <Authorized Context="auth">
+          <EditForm Model="_editDeal" OnValidSubmit="SaveQuickEditAsync">
+            <DataAnnotationsValidator />
+            <div class="space-y-2">
+              <InputText class="ui-input" @bind-Value="_editDeal!.Title" />
+              <div class="grid grid-cols-2 gap-2">
+                <InputNumber class="ui-input" @bind-Value="_editDeal!.Amount" />
+                <InputText class="ui-input" @bind-Value="_editDeal!.Currency" />
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <InputNumber class="ui-input" @bind-Value="_editDeal!.Probability" />
+                <InputSelect class="ui-select" @bind-Value="_editDeal!.StageId">
+                  @foreach (var s in _stages)
+                  {
+                    <option value="@s.Id">@s.Name</option>
+                  }
+                </InputSelect>
+              </div>
+              <div class="flex justify-end gap-2">
+                <UiButton Variant="muted" OnClick="CloseDrawer">Close</UiButton>
+                <UiButton Variant="primary">Save</UiButton>
+              </div>
+            </div>
+          </EditForm>
+        </Authorized>
+      </AuthorizeView>
+
+      <UiCard Class="p-3">
+        <div class="text-sm font-semibold mb-2">Timeline</div>
+        @if (_loadingTimeline)
+        {
+          <div class="space-y-2">
+            <UiSkeleton Style="height:52px" />
+            <UiSkeleton Style="height:52px" />
+          </div>
+        }
+        else
+        {
+          <ActivityTimeline Items="_timeline" />
+        }
+      </UiCard>
+    </div>
+  }
+</UiDrawer>
+
+

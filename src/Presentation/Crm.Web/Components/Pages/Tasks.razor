@@ -1,0 +1,112 @@
+@page "/tasks"
+@using Crm.Application.Services
+@using Crm.Domain.Entities
+@using Crm.Domain.Enums
+@using TaskStatusDomain = Crm.Domain.Enums.TaskStatus
+@using Microsoft.AspNetCore.Identity
+@using Crm.Application.Security
+
+<h1 class="text-2xl font-semibold mb-4">Tasks</h1>
+
+<div class="card p-4 space-y-3">
+  <div class="flex flex-wrap items-center gap-2">
+    <input class="input w-72" placeholder="Filter tasks..." @bind="_filter" @bind:event="oninput" />
+    <select class="select w-56" @bind="_ownerFilter">
+      <option value="">All owners</option>
+      @foreach (var u in _users)
+      {
+        <option value="@u.Id">@DisplayName(u)</option>
+      }
+    </select>
+    <select class="select w-40" @bind="_priority">
+      <option value="">All priorities</option>
+      @foreach (var p in Enum.GetValues<TaskPriority>())
+      {
+        <option value="@p.ToString()">@p</option>
+      }
+    </select>
+    <select class="select w-40" @bind="_status">
+      <option value="">All statuses</option>
+      @foreach (var s in Enum.GetValues<TaskStatusDomain>())
+      {
+        <option value="@s.ToString()">@s</option>
+      }
+    </select>
+    <button class="btn btn-muted" @onclick="Reload">Apply</button>
+  </div>
+
+  @if (_loading)
+  {
+    <div>Loading...</div>
+  }
+  else if (!_items.Any())
+  {
+    <div class="text-slate-500">No tasks</div>
+  }
+  else
+  {
+    <div class="divide-y divide-white/40 dark:divide-white/10">
+      @foreach (var t in _items)
+      {
+        <div class="py-3 flex items-start gap-3">
+          <div class="w-32 text-xs"><span class="chip">@t.Priority</span></div>
+          <div class="flex-1 min-w-0">
+            <div class="font-medium">
+              <a class="link" href="/tasks/@t.Id">@t.Title</a>
+            </div>
+            <div class="text-xs text-slate-500 flex items-center gap-2">
+              @if (t.DueAt is not null)
+              {
+                <span>Due @t.DueAt.Value.ToLocalTime().ToString("g")</span>
+              }
+              <span class="chip">@OwnerName(t.OwnerId)</span>
+            </div>
+            <div class="text-xs text-slate-400">
+              @if (t.RelatedTo == RelatedToType.Company && t.RelatedId is Guid cid)
+              {
+                <a class="link" href="/companies/@cid">Company @cid</a>
+              }
+              else if (t.RelatedTo == RelatedToType.Contact && t.RelatedId is Guid coid)
+              {
+                <a class="link" href="/contacts/@coid">Contact @coid</a>
+              }
+              else if (t.RelatedTo == RelatedToType.Deal && t.RelatedId is Guid did)
+              {
+                <a class="link" href="/deals/@did">Deal @did</a>
+              }
+            </div>
+          </div>
+          <div class="w-72 flex items-center gap-2">
+            <AuthorizeView Policy="@Permissions.Tasks_Write">
+              <Authorized>
+                <select class="select w-40" value="@t.Status.ToString()" @onchange="e => ChangeStatus(t, e.Value?.ToString())">
+                  @foreach (var s in Enum.GetValues<TaskStatusDomain>())
+                  {
+                    <option value="@s.ToString()" selected="@(s==t.Status)">@s</option>
+                  }
+                </select>
+                <select class="select w-32" value="@t.OwnerId?.ToString()" @onchange="e => ChangeOwner(t, e.Value?.ToString())">
+                  <option value="">Unassigned</option>
+                  @foreach (var u in _users)
+                  {
+                    <option value="@u.Id" selected="@(t.OwnerId?.ToString()==u.Id)">@DisplayName(u)</option>
+                  }
+                </select>
+              </Authorized>
+              <NotAuthorized>
+                <select class="select w-40" disabled>
+                  <option>@t.Status</option>
+                </select>
+                <select class="select w-32" disabled>
+                  <option>@OwnerName(t.OwnerId)</option>
+                </select>
+              </NotAuthorized>
+            </AuthorizeView>
+          </div>
+        </div>
+      }
+    </div>
+  }
+</div>
+
+

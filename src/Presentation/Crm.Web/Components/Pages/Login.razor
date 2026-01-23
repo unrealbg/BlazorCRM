@@ -1,0 +1,32 @@
+@page "/login"
+@attribute [AllowAnonymous]
+@inject NavigationManager Nav
+
+<div class="max-w-xl mx-auto card p-4 mt-20">
+    <h2 class="text-lg font-semibold mb-2">Sign in</h2>
+
+    @if (HasError)
+    {
+        <div class="mb-3 rounded-xl px-3.5 py-2 border bg-white/80 border-white/40 text-sm text-rose-700">Invalid credentials</div>
+    }
+
+    <form method="post" action="/auth/login">
+        <AntiforgeryToken />
+        <div class="mb-2">
+            <label class="text-sm block mb-1" for="email">Email</label>
+            <input id="email" name="Email" class="input" type="email" autocomplete="username" required />
+        </div>
+        <div class="mb-2">
+            <label class="text-sm block mb-1" for="password">Password</label>
+            <input id="password" name="Password" class="input" type="password" autocomplete="current-password" required />
+        </div>
+        <div class="mb-2">
+            <label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" name="RememberMe" class="rounded" /> Remember me</label>
+        </div>
+        <button type="submit" class="btn btn-primary">Sign in</button>
+    </form>
+</div>
+
+@code {
+    private bool HasError => new Uri(Nav.Uri).Query?.Contains("e=1", StringComparison.OrdinalIgnoreCase) == true;
+}
