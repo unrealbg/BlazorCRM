@@ -13,6 +13,10 @@ namespace Crm.Infrastructure.Identity
     public static class IdentitySeeder
     {
         private sealed class IdentitySeederLog { }
+        private sealed class SeedTenantProvider : ITenantProvider
+        {
+            public Guid TenantId => Guid.Empty;
+        }
 
         public static async Task SeedAsync(IServiceProvider services, IConfiguration configuration)
         {
@@ -26,7 +30,7 @@ namespace Crm.Infrastructure.Identity
             var tenantSlug = string.IsNullOrWhiteSpace(options.DefaultTenantSlug) ? "demo" : options.DefaultTenantSlug;
             var tenantName = string.IsNullOrWhiteSpace(options.DefaultTenantName) ? "Demo" : options.DefaultTenantName;
 
-            var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Slug == tenantSlug);
+            var tenant = await db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == tenantSlug);
             if (tenant is null)
             {
                 tenant = new Tenant
@@ -35,8 +39,10 @@ namespace Crm.Infrastructure.Identity
                     Name = tenantName,
                     Slug = tenantSlug
                 };
-                await db.Tenants.AddAsync(tenant);
-                await db.SaveChangesAsync();
+                var dbOptions = scope.ServiceProvider.GetRequiredService<DbContextOptions<CrmDbContext>>();
+                await using var seedDb = new CrmDbContext(dbOptions, new SeedTenantProvider());
+                await seedDb.Tenants.AddAsync(tenant);
+                await seedDb.SaveChangesAsync();
                 logger.LogInformation("Seeded tenant {TenantId} ({TenantName}) for identity.", tenant.Id, tenantName);
             }
             else
