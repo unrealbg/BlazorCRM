@@ -593,7 +593,8 @@ app.MapPost("/api/auth/login", async (
     ITokenService tokens,
     ITenantResolver tenantResolver,
     CrmDbContext db,
-    IHostEnvironment env) =>
+    IHostEnvironment env,
+    HttpContext ctx) =>
 {
     var user = await users.FindByNameAsync(req.UserName);
     if (user is null)
@@ -637,17 +638,48 @@ app.MapPost("/api/auth/login", async (
 
     var res = tokens.CreateToken(user.Id, user.UserName!, resolution.TenantId, resolution.TenantSlug ?? string.Empty);
     var hash = JwtTokenService.HashRefresh(res.RefreshToken);
-    db.RefreshTokens.Add(new RefreshToken { Id = Guid.NewGuid(), UserId = user.Id, TokenHash = hash, ExpiresAtUtc = DateTime.UtcNow.AddDays(14) });
+    db.RefreshTokens.Add(new RefreshToken
+    {
+        Id = Guid.NewGuid(),
+        UserId = user.Id,
+        TenantId = resolution.TenantId,
+        TokenHash = hash,
+        ExpiresAtUtc = DateTime.UtcNow.AddDays(14),
+        CreatedAtUtc = DateTime.UtcNow,
+        CreatedByIp = ctx.Connection.RemoteIpAddress?.ToString(),
+        UserAgent = ctx.Request.Headers.UserAgent.ToString()
+    });
     await db.SaveChangesAsync();
     return Results.Ok(res);
 });
 
 // Refresh endpoint
-app.MapPost("/api/auth/refresh", async (RefreshRequest req, UserManager<IdentityUser> users, ITokenService tokens, ITenantResolver tenantResolver, CrmDbContext db) =>
+app.MapPost("/api/auth/refresh", async (RefreshRequest req, UserManager<IdentityUser> users, ITokenService tokens, ITenantResolver tenantResolver, CrmDbContext db, HttpContext ctx) =>
 {
     var hash = JwtTokenService.HashRefresh(req.RefreshToken);
-    var existing = await db.RefreshTokens.FirstOrDefaultAsync(r => r.TokenHash == hash && !r.IsRevoked);
-    if (existing is null || existing.ExpiresAtUtc < DateTime.UtcNow)
+    var existing = await db.RefreshTokens.FirstOrDefaultAsync(r => r.TokenHash == hash);
+    if (existing is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    if (existing.IsRevoked)
+    {
+        var family = db.RefreshTokens.Where(r => r.UserId == existing.UserId && r.TenantId == existing.TenantId && !r.IsRevoked);
+        await family.ExecuteUpdateAsync(s => s
+            .SetProperty(x => x.IsRevoked, true)
+            .SetProperty(x => x.RevokedAtUtc, DateTime.UtcNow)
+            .SetProperty(x => x.RevokedByIp, ctx.Connection.RemoteIpAddress?.ToString()));
+        return Results.Unauthorized();
+    }
+
+    if (existing.ExpiresAtUtc < DateTime.UtcNow)
+    {
+        return Results.Unauthorized();
+    }
+
+    var resolution = tenantResolver.Resolve();
+    if (!resolution.IsResolved || resolution.TenantId != existing.TenantId)
     {
         return Results.Unauthorized();
     }
@@ -660,15 +692,25 @@ app.MapPost("/api/auth/refresh", async (RefreshRequest req, UserManager<Identity
 
     // rotate
     existing.IsRevoked = true;
-    var resolution = tenantResolver.Resolve();
-    if (!resolution.IsResolved)
-    {
-        return Results.BadRequest("Tenant could not be resolved.");
-    }
+    existing.RevokedAtUtc = DateTime.UtcNow;
+    existing.RevokedByIp = ctx.Connection.RemoteIpAddress?.ToString();
 
-    var newToken = tokens.CreateToken(user.Id, user.UserName!, resolution.TenantId, resolution.TenantSlug ?? string.Empty);
+    var tenant = await db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Id == existing.TenantId);
+    var tenantSlug = tenant?.Slug ?? resolution.TenantSlug ?? string.Empty;
+    var newToken = tokens.CreateToken(user.Id, user.UserName!, existing.TenantId, tenantSlug);
     var newHash = JwtTokenService.HashRefresh(newToken.RefreshToken);
-    db.RefreshTokens.Add(new RefreshToken { Id = Guid.NewGuid(), UserId = user.Id, TokenHash = newHash, ExpiresAtUtc = DateTime.UtcNow.AddDays(14), ReplacedByHash = newHash });
+    existing.ReplacedByHash = newHash;
+    db.RefreshTokens.Add(new RefreshToken
+    {
+        Id = Guid.NewGuid(),
+        UserId = user.Id,
+        TenantId = existing.TenantId,
+        TokenHash = newHash,
+        ExpiresAtUtc = DateTime.UtcNow.AddDays(14),
+        CreatedAtUtc = DateTime.UtcNow,
+        CreatedByIp = ctx.Connection.RemoteIpAddress?.ToString(),
+        UserAgent = ctx.Request.Headers.UserAgent.ToString()
+    });
     await db.SaveChangesAsync();
 
     return Results.Ok(newToken);
@@ -679,24 +721,37 @@ app.MapPost("/api/auth/logout", async (
     LogoutRequest req,
     UserManager<IdentityUser> users,
     ICurrentUser current,
-    CrmDbContext db) =>
+    ITenantResolver tenantResolver,
+    CrmDbContext db,
+    HttpContext ctx) =>
 {
     var userId = current.UserId;
     if (string.IsNullOrEmpty(userId)) return Results.Unauthorized();
 
+    var resolution = tenantResolver.Resolve();
+    if (!resolution.IsResolved)
+    {
+        return Results.BadRequest("Tenant could not be resolved.");
+    }
+
     if (!string.IsNullOrWhiteSpace(req.RefreshToken))
     {
         var hash = JwtTokenService.HashRefresh(req.RefreshToken);
-        var one = await db.RefreshTokens.FirstOrDefaultAsync(r => r.UserId == userId && r.TokenHash == hash);
+        var one = await db.RefreshTokens.FirstOrDefaultAsync(r => r.UserId == userId && r.TenantId == resolution.TenantId && r.TokenHash == hash);
         if (one is not null)
         {
             one.IsRevoked = true;
+            one.RevokedAtUtc = DateTime.UtcNow;
+            one.RevokedByIp = ctx.Connection.RemoteIpAddress?.ToString();
         }
     }
     else
     {
-        var all = db.RefreshTokens.Where(r => r.UserId == userId && !r.IsRevoked);
-        await all.ExecuteUpdateAsync(s => s.SetProperty(x => x.IsRevoked, true));
+        var all = db.RefreshTokens.Where(r => r.UserId == userId && r.TenantId == resolution.TenantId && !r.IsRevoked);
+        await all.ExecuteUpdateAsync(s => s
+            .SetProperty(x => x.IsRevoked, true)
+            .SetProperty(x => x.RevokedAtUtc, DateTime.UtcNow)
+            .SetProperty(x => x.RevokedByIp, ctx.Connection.RemoteIpAddress?.ToString()));
     }
 
     await db.SaveChangesAsync();

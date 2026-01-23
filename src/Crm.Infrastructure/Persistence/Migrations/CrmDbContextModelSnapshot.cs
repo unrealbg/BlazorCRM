@@ -501,14 +501,26 @@ namespace Crm.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("CreatedByIp")
+                        .HasColumnType("text");
+
                     b.Property<DateTime>("ExpiresAtUtc")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsRevoked")
                         .HasColumnType("boolean");
 
+                    b.Property<DateTime?>("RevokedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RevokedByIp")
+                        .HasColumnType("text");
+
                     b.Property<string>("ReplacedByHash")
                         .HasColumnType("text");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("TokenHash")
                         .IsRequired()
@@ -518,9 +530,14 @@ namespace Crm.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("UserAgent")
+                        .HasColumnType("text");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ExpiresAtUtc");
+
+                    b.HasIndex("UserId", "TenantId", "IsRevoked");
 
                     b.HasIndex("UserId", "TokenHash")
                         .IsUnique();
