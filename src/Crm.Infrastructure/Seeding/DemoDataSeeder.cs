@@ -11,6 +11,10 @@ namespace Crm.Infrastructure.Seeding
     public static class DemoDataSeeder
     {
         private sealed class DemoDataSeederLog { }
+        private sealed class SeedTenantProvider : ITenantProvider
+        {
+            public Guid TenantId => Guid.Empty;
+        }
 
         public static async Task SeedAsync(IServiceProvider sp, CancellationToken ct = default)
         {
@@ -21,7 +25,7 @@ namespace Crm.Infrastructure.Seeding
             var tenantSlug = string.IsNullOrWhiteSpace(options.DefaultTenantSlug) ? "demo" : options.DefaultTenantSlug;
             var tenantName = string.IsNullOrWhiteSpace(options.DefaultTenantName) ? "Demo" : options.DefaultTenantName;
 
-            var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Slug == tenantSlug, ct);
+            var tenant = await db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == tenantSlug, ct);
             if (tenant is null)
             {
                 tenant = new Tenant
@@ -30,8 +34,10 @@ namespace Crm.Infrastructure.Seeding
                     Name = tenantName,
                     Slug = tenantSlug
                 };
-                await db.Tenants.AddAsync(tenant, ct);
-                await db.SaveChangesAsync(ct);
+                var dbOptions = sp.GetRequiredService<DbContextOptions<CrmDbContext>>();
+                await using var seedDb = new CrmDbContext(dbOptions, new SeedTenantProvider());
+                await seedDb.Tenants.AddAsync(tenant, ct);
+                await seedDb.SaveChangesAsync(ct);
                 logger.LogInformation("Seeded tenant {TenantId} ({TenantName}).", tenant.Id, tenantName);
             }
             else
