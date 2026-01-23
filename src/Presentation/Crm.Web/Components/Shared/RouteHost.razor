@@ -1,0 +1,15 @@
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager Nav
+
+<Router AppAssembly="typeof(Program).Assembly">
+  <Found Context="routeData">
+    <AuthorizeRouteView RouteData="routeData" DefaultLayout="null">
+      <NotAuthorized>
+        <RedirectToLogin />
+      </NotAuthorized>
+    </AuthorizeRouteView>
+  </Found>
+  <NotFound>
+    <div class="card p-4">Not found</div>
+  </NotFound>
+</Router>

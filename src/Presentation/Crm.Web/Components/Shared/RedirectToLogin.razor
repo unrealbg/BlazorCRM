@@ -1,0 +1,11 @@
+@inject NavigationManager Nav
+
+<div class="card p-4">Redirecting to login…</div>
+
+@code {
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender) return;
+        Nav.NavigateTo("/login", forceLoad: true);
+    }
+}
