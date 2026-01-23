@@ -11,18 +11,23 @@ namespace Crm.Infrastructure.Multitenancy
     public sealed class SubdomainTenantResolver : ITenantResolver
     {
         private readonly IHttpContextAccessor _ctx;
-        private readonly CrmDbContext _db;
+        private readonly DbContextOptions<CrmDbContext> _dbOptions;
         private readonly TenantOptions _options;
         private readonly IHostEnvironment _env;
 
+        private sealed class NullTenantProvider : ITenantProvider
+        {
+            public Guid TenantId => Guid.Empty;
+        }
+
         public SubdomainTenantResolver(
             IHttpContextAccessor ctx,
-            CrmDbContext db,
+            DbContextOptions<CrmDbContext> dbOptions,
             IOptions<TenantOptions> options,
             IHostEnvironment env)
         {
             _ctx = ctx;
-            _db = db;
+            _dbOptions = dbOptions;
             _options = options.Value;
             _env = env;
         }
@@ -57,7 +62,8 @@ namespace Crm.Infrastructure.Multitenancy
                 return Cache(http, new TenantResolution(Guid.Empty, null, null, false, "Tenant slug could not be determined from host."));
             }
 
-            var tenant = _db.Tenants.AsNoTracking().FirstOrDefault(t => t.Slug == slug);
+            using var db = new CrmDbContext(_dbOptions, new NullTenantProvider());
+            var tenant = db.Tenants.AsNoTracking().FirstOrDefault(t => t.Slug == slug);
             if (tenant is null)
             {
                 return Cache(http, new TenantResolution(Guid.Empty, null, slug, false, $"Tenant '{slug}' not found."));
