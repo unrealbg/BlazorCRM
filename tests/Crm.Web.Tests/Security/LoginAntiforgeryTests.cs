@@ -23,8 +23,8 @@ namespace Crm.Web.Tests.Security
                 {
                     var settings = new Dictionary<string, string?>
                     {
-                        ["Tenancy:DefaultTenantId"] = "11111111-1111-1111-1111-111111111111",
-                        ["Tenancy:DefaultTenantName"] = "Default",
+                        ["Tenancy:DefaultTenantSlug"] = "demo",
+                        ["Tenancy:DefaultTenantName"] = "Demo",
                         ["Jwt:Key"] = "TEST_KEY_01234567890123456789012345678901",
                         ["Jwt:Issuer"] = "BlazorCrm",
                         ["Jwt:Audience"] = "BlazorCrmClients"
@@ -46,6 +46,12 @@ namespace Crm.Web.Tests.Security
             using var scope = services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<CrmDbContext>();
             await db.Database.EnsureCreatedAsync();
+
+            if (!await db.Tenants.AnyAsync(t => t.Slug == "demo"))
+            {
+                db.Tenants.Add(new Crm.Domain.Entities.Tenant { Id = Guid.NewGuid(), Name = "Demo", Slug = "demo" });
+                await db.SaveChangesAsync();
+            }
 
             var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
             var user = new IdentityUser
@@ -81,6 +87,7 @@ namespace Crm.Web.Tests.Security
                 AllowAutoRedirect = false,
                 HandleCookies = true
             });
+            client.DefaultRequestHeaders.Host = "demo.localhost";
 
             var form = new Dictionary<string, string>
             {
@@ -105,6 +112,7 @@ namespace Crm.Web.Tests.Security
                 AllowAutoRedirect = false,
                 HandleCookies = true
             });
+            client.DefaultRequestHeaders.Host = "demo.localhost";
 
             var token = await GetAntiforgeryTokenAsync(client);
             var form = new Dictionary<string, string>

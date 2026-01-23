@@ -30,8 +30,8 @@ namespace Crm.Web.Tests.Search
                 {
                     var settings = new Dictionary<string, string?>
                     {
-                        ["Tenancy:DefaultTenantId"] = DefaultTenantId.ToString(),
-                        ["Tenancy:DefaultTenantName"] = "Default",
+                        ["Tenancy:DefaultTenantSlug"] = "demo",
+                        ["Tenancy:DefaultTenantName"] = "Demo",
                         ["Jwt:Key"] = "TEST_KEY_01234567890123456789012345678901",
                         ["Jwt:Issuer"] = "BlazorCrm",
                         ["Jwt:Audience"] = "BlazorCrmClients"
@@ -54,7 +54,7 @@ namespace Crm.Web.Tests.Search
             var db = scope.ServiceProvider.GetRequiredService<CrmDbContext>();
             await db.Database.EnsureCreatedAsync();
 
-            db.Tenants.Add(new Tenant { Id = tenantId, Name = "Default", Slug = "default" });
+            db.Tenants.Add(new Tenant { Id = tenantId, Name = "Demo", Slug = "demo" });
             db.Tenants.Add(new Tenant { Id = otherTenantId, Name = "Other", Slug = "other" });
 
             db.Companies.Add(new Company { Id = Guid.NewGuid(), Name = "Acme Corp", Industry = "Manufacturing", TenantId = tenantId });
@@ -96,6 +96,7 @@ namespace Crm.Web.Tests.Search
                 AllowAutoRedirect = false,
                 HandleCookies = true
             });
+            client.DefaultRequestHeaders.Host = "demo.localhost";
 
             var token = await GetAntiforgeryTokenAsync(client);
             var form = new Dictionary<string, string>

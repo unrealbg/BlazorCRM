@@ -2,7 +2,6 @@ namespace Crm.Web.Tests.Seeding
 {
     using Crm.Application.Common.Multitenancy;
     using Crm.Domain.Entities;
-    using Crm.Infrastructure.Multitenancy;
     using Crm.Infrastructure.Persistence;
     using Crm.Infrastructure.Seeding;
     using Microsoft.AspNetCore.Http;
@@ -13,6 +12,12 @@ namespace Crm.Web.Tests.Seeding
 
     public class DemoDataSeederTests
     {
+        private sealed class FixedTenantProvider : ITenantProvider
+        {
+            public FixedTenantProvider(Guid tenantId) => TenantId = tenantId;
+            public Guid TenantId { get; }
+        }
+
         private static ServiceProvider BuildServices(Guid tenantId)
         {
             var services = new ServiceCollection();
@@ -20,11 +25,10 @@ namespace Crm.Web.Tests.Seeding
             services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
             services.Configure<TenantOptions>(o =>
             {
-                o.DefaultTenantId = tenantId;
-                o.DefaultTenantName = "Default";
+                o.DefaultTenantSlug = "demo";
+                o.DefaultTenantName = "Demo";
             });
-            services.AddScoped<ITenantResolver, DefaultTenantResolver>();
-            services.AddScoped<ITenantProvider, HttpTenantProvider>();
+            services.AddScoped<ITenantProvider>(_ => new FixedTenantProvider(tenantId));
             services.AddDbContext<CrmDbContext>(o => o.UseInMemoryDatabase($"demo-seed-{Guid.NewGuid()}"));
             return services.BuildServiceProvider();
         }
@@ -35,10 +39,12 @@ namespace Crm.Web.Tests.Seeding
             var tenantId = Guid.Parse("11111111-1111-1111-1111-111111111111");
             using var sp = BuildServices(tenantId);
 
-            await DemoDataSeeder.SeedAsync(sp);
-            await DemoDataSeeder.SeedAsync(sp);
-
             var db = sp.GetRequiredService<CrmDbContext>();
+            db.Tenants.Add(new Tenant { Id = tenantId, Name = "Demo", Slug = "demo" });
+            await db.SaveChangesAsync();
+
+            await DemoDataSeeder.SeedAsync(sp);
+            await DemoDataSeeder.SeedAsync(sp);
 
             Assert.Equal(1, await db.Pipelines.CountAsync());
             Assert.Equal(4, await db.Stages.CountAsync());
@@ -53,9 +59,11 @@ namespace Crm.Web.Tests.Seeding
             var tenantId = Guid.Parse("11111111-1111-1111-1111-111111111111");
             using var sp = BuildServices(tenantId);
 
-            await DemoDataSeeder.SeedAsync(sp);
-
             var db = sp.GetRequiredService<CrmDbContext>();
+            db.Tenants.Add(new Tenant { Id = tenantId, Name = "Demo", Slug = "demo" });
+            await db.SaveChangesAsync();
+
+            await DemoDataSeeder.SeedAsync(sp);
 
             Assert.All(await db.Pipelines.Select(p => p.TenantId).ToListAsync(), id => Assert.Equal(tenantId, id));
             Assert.All(await db.Stages.Select(s => s.TenantId).ToListAsync(), id => Assert.Equal(tenantId, id));
