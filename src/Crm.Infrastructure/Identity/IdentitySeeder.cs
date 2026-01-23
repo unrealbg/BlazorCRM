@@ -23,28 +23,25 @@ namespace Crm.Infrastructure.Identity
             var options = scope.ServiceProvider.GetRequiredService<IOptions<TenantOptions>>().Value;
             var db = scope.ServiceProvider.GetRequiredService<CrmDbContext>();
 
-            if (options.DefaultTenantId == Guid.Empty)
-            {
-                throw new InvalidOperationException("Identity seeding requires Tenancy:DefaultTenantId to be configured.");
-            }
+            var tenantSlug = string.IsNullOrWhiteSpace(options.DefaultTenantSlug) ? "demo" : options.DefaultTenantSlug;
+            var tenantName = string.IsNullOrWhiteSpace(options.DefaultTenantName) ? "Demo" : options.DefaultTenantName;
 
-            var tenantId = options.DefaultTenantId;
-            var tenantName = string.IsNullOrWhiteSpace(options.DefaultTenantName) ? "Default" : options.DefaultTenantName;
-
-            if (!await db.Tenants.AnyAsync(t => t.Id == tenantId))
+            var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Slug == tenantSlug);
+            if (tenant is null)
             {
-                await db.Tenants.AddAsync(new Tenant
+                tenant = new Tenant
                 {
-                    Id = tenantId,
+                    Id = Guid.NewGuid(),
                     Name = tenantName,
-                    Slug = "default"
-                });
+                    Slug = tenantSlug
+                };
+                await db.Tenants.AddAsync(tenant);
                 await db.SaveChangesAsync();
-                logger.LogInformation("Seeded tenant {TenantId} ({TenantName}) for identity.", tenantId, tenantName);
+                logger.LogInformation("Seeded tenant {TenantId} ({TenantName}) for identity.", tenant.Id, tenantName);
             }
             else
             {
-                logger.LogInformation("Tenant {TenantId} already exists. Skipping tenant seed for identity.", tenantId);
+                logger.LogInformation("Tenant {TenantId} already exists. Skipping tenant seed for identity.", tenant.Id);
             }
 
             var rolesCfg = configuration.GetSection("Seed:Roles").GetChildren().Select(c => c.Value!).Where(v => !string.IsNullOrWhiteSpace(v));
@@ -104,6 +101,16 @@ namespace Crm.Infrastructure.Identity
                 {
                     logger.LogInformation("Admin user already has role '{Role}'.", role);
                 }
+            }
+
+            var claims = await userManager.GetClaimsAsync(admin);
+            if (!claims.Any(c => c.Type == "tenant" && c.Value == tenant.Id.ToString()))
+            {
+                await userManager.AddClaimAsync(admin, new System.Security.Claims.Claim("tenant", tenant.Id.ToString()));
+            }
+            if (!claims.Any(c => c.Type == "tenant_slug" && c.Value == tenant.Slug))
+            {
+                await userManager.AddClaimAsync(admin, new System.Security.Claims.Claim("tenant_slug", tenant.Slug));
             }
         }
     }
