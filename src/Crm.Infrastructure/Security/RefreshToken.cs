@@ -6,6 +6,8 @@ namespace Crm.Infrastructure.Security
 
         public string UserId { get; set; } = default!;
 
+        public Guid TenantId { get; set; }
+
         public string TokenHash { get; set; } = default!;
 
         public DateTime ExpiresAtUtc { get; set; }
@@ -15,5 +17,13 @@ namespace Crm.Infrastructure.Security
         public string? ReplacedByHash { get; set; }
 
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+
+        public DateTime? RevokedAtUtc { get; set; }
+
+        public string? CreatedByIp { get; set; }
+
+        public string? RevokedByIp { get; set; }
+
+        public string? UserAgent { get; set; }
     }
 }
