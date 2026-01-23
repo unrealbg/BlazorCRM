@@ -208,7 +208,10 @@ namespace Crm.Infrastructure.Persistence
                 b.HasKey(x => x.Id);
                 b.Property(x => x.UserId).IsRequired();
                 b.Property(x => x.TokenHash).IsRequired();
+                b.Property(x => x.TenantId).IsRequired();
+                b.Property(x => x.CreatedAtUtc).IsRequired();
                 b.HasIndex(x => new { x.UserId, x.TokenHash }).IsUnique();
+                b.HasIndex(x => new { x.UserId, x.TenantId, x.IsRevoked });
                 b.HasIndex(x => x.ExpiresAtUtc);
             });
 
