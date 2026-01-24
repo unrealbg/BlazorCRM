@@ -11,17 +11,42 @@ namespace Crm.Infrastructure.Services
 
         public EfTaskService(CrmDbContext db) => _db = db;
 
-        public async Task<IEnumerable<TaskItem>> GetAllAsync(string? filter = null, CancellationToken ct = default)
+        public async Task<Crm.Application.Common.Models.PagedResult<TaskItem>> SearchAsync(
+            string? filter = null,
+            Guid? ownerId = null,
+            Crm.Domain.Enums.TaskPriority? priority = null,
+            Crm.Domain.Enums.TaskStatus? status = null,
+            int page = 1,
+            int pageSize = 50,
+            CancellationToken ct = default)
         {
             IQueryable<TaskItem> q = _db.Tasks.AsNoTracking();
 
             if (!string.IsNullOrWhiteSpace(filter))
             {
-                var f = filter.Trim().ToLowerInvariant();
+                var f = filter.Trim();
                 q = q.Where(t => EF.Functions.ILike(t.Title, $"%{f}%"));
             }
 
-            return await q.OrderBy(t => t.DueAt ?? DateTime.MaxValue).ToListAsync(ct);
+            if (ownerId is Guid oid)
+            {
+                q = q.Where(t => t.OwnerId == oid);
+            }
+
+            if (priority is not null)
+            {
+                q = q.Where(t => t.Priority == priority);
+            }
+
+            if (status is not null)
+            {
+                q = q.Where(t => t.Status == status);
+            }
+
+            var ordered = q.OrderBy(t => t.DueAt ?? DateTime.MaxValue).ThenBy(t => t.Id);
+            var total = await ordered.CountAsync(ct);
+            var items = await ordered.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
+            return new Crm.Application.Common.Models.PagedResult<TaskItem>(items, total);
         }
 
         public async Task<TaskItem> GetByIdAsync(Guid id, CancellationToken ct = default) =>

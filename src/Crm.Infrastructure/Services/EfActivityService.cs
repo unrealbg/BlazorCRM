@@ -11,7 +11,13 @@ namespace Crm.Infrastructure.Services
 
         public EfActivityService(CrmDbContext db) => _db = db;
 
-        public async Task<IEnumerable<Activity>> GetAllAsync(Guid? relatedId = null, CancellationToken ct = default)
+        public async Task<Crm.Application.Common.Models.PagedResult<Activity>> GetPageAsync(
+            Guid? relatedId = null,
+            Crm.Domain.Enums.ActivityType? type = null,
+            Crm.Domain.Enums.ActivityStatus? status = null,
+            int page = 1,
+            int pageSize = 50,
+            CancellationToken ct = default)
         {
             IQueryable<Activity> q = _db.Activities.AsNoTracking();
             if (relatedId is Guid rid)
@@ -19,7 +25,20 @@ namespace Crm.Infrastructure.Services
                 q = q.Where(a => a.RelatedId == rid);
             }
 
-            return await q.OrderByDescending(a => a.DueAt).ToListAsync(ct);
+            if (type is not null)
+            {
+                q = q.Where(a => a.Type == type);
+            }
+
+            if (status is not null)
+            {
+                q = q.Where(a => a.Status == status);
+            }
+
+            var ordered = q.OrderByDescending(a => a.DueAt ?? DateTime.MaxValue).ThenBy(a => a.Id);
+            var total = await ordered.CountAsync(ct);
+            var items = await ordered.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
+            return new Crm.Application.Common.Models.PagedResult<Activity>(items, total);
         }
 
         public async Task<Activity> GetByIdAsync(Guid id, CancellationToken ct = default) =>

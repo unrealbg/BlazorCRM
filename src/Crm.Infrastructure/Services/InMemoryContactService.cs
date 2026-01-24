@@ -8,7 +8,11 @@ namespace Crm.Infrastructure.Services
     {
         private readonly ConcurrentDictionary<Guid, Contact> _store = new();
 
-        public Task<IEnumerable<Contact>> GetAllAsync(string? search = null, CancellationToken ct = default)
+        public Task<Crm.Application.Common.Models.PagedResult<Contact>> SearchAsync(
+            string? search = null,
+            int page = 1,
+            int pageSize = 50,
+            CancellationToken ct = default)
         {
             IEnumerable<Contact> result = _store.Values;
             if (!string.IsNullOrWhiteSpace(search))
@@ -23,7 +27,11 @@ namespace Crm.Infrastructure.Services
                 );
             }
 
-            return Task.FromResult<IEnumerable<Contact>>(result.OrderBy(c => c.LastName).ThenBy(c => c.FirstName).ToArray());
+            var ordered = result.OrderBy(c => c.LastName).ThenBy(c => c.FirstName).ThenBy(c => c.Id);
+            var total = ordered.Count();
+            var items = ordered.Skip((page - 1) * pageSize).Take(pageSize).ToArray();
+
+            return Task.FromResult(new Crm.Application.Common.Models.PagedResult<Contact>(items, total));
         }
 
         public Task<Contact> GetByIdAsync(Guid id, CancellationToken ct = default)

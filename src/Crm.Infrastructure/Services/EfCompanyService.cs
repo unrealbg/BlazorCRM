@@ -15,7 +15,14 @@ namespace Crm.Infrastructure.Services
             _db = db;
         }
 
-        public async Task<IEnumerable<Company>> GetAllAsync(string? search = null, CancellationToken ct = default)
+        public async Task<Crm.Application.Common.Models.PagedResult<Crm.Application.Companies.Queries.CompanyListItem>> SearchAsync(
+            string? search,
+            string? industry,
+            string sort,
+            bool asc,
+            int page,
+            int pageSize,
+            CancellationToken ct = default)
         {
             IQueryable<Company> q = _db.Companies.AsNoTracking();
             if (!string.IsNullOrWhiteSpace(search))
@@ -28,7 +35,48 @@ namespace Crm.Infrastructure.Services
                 );
             }
 
-            return await q.OrderBy(c => c.Name).ToListAsync(ct);
+            if (!string.IsNullOrWhiteSpace(industry))
+            {
+                q = q.Where(c => c.Industry != null && c.Industry == industry);
+            }
+
+            var ordered = (sort, asc) switch
+            {
+                (nameof(Company.Name), true) => q.OrderBy(c => c.Name),
+                (nameof(Company.Name), false) => q.OrderByDescending(c => c.Name),
+                (nameof(Company.Industry), true) => q.OrderBy(c => c.Industry),
+                (nameof(Company.Industry), false) => q.OrderByDescending(c => c.Industry),
+                _ => q.OrderBy(c => c.Name)
+            };
+
+            var total = await ordered.CountAsync(ct);
+            var items = await ordered
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(c => new Crm.Application.Companies.Queries.CompanyListItem(c.Id, c.Name, c.Industry))
+                .ToListAsync(ct);
+
+            return new Crm.Application.Common.Models.PagedResult<Crm.Application.Companies.Queries.CompanyListItem>(items, total);
+        }
+
+        public async Task<string[]> GetDistinctIndustriesAsync(string? search = null, CancellationToken ct = default)
+        {
+            IQueryable<Company> q = _db.Companies.AsNoTracking();
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var s = search.Trim();
+                q = q.Where(c =>
+                    EF.Functions.Like(c.Name, $"%{s}%") ||
+                    (c.Industry != null && EF.Functions.Like(c.Industry, $"%{s}%")) ||
+                    (c.Address != null && EF.Functions.Like(c.Address, $"%{s}%"))
+                );
+            }
+
+            return await q.Where(c => c.Industry != null && c.Industry != "")
+                .Select(c => c.Industry!)
+                .Distinct()
+                .OrderBy(x => x)
+                .ToArrayAsync(ct);
         }
 
         public async Task<Company> GetByIdAsync(Guid id, CancellationToken ct = default)
@@ -71,6 +119,7 @@ namespace Crm.Infrastructure.Services
                 if (!c.Tags.Any(t => string.Equals(t, tag, StringComparison.OrdinalIgnoreCase)))
                     c.Tags.Add(tag);
             }
+
             await _db.SaveChangesAsync(ct);
 
             return companies.Count;
