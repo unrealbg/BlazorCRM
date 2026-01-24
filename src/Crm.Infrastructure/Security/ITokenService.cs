@@ -4,6 +4,6 @@ namespace Crm.Infrastructure.Security
 
     public interface ITokenService
     {
-        LoginResponse CreateToken(string userId, string userName, Guid tenantId, string tenantSlug);
+        LoginResponse CreateToken(string userId, string userName, Guid tenantId, string tenantSlug, IEnumerable<string> roles);
     }
 }

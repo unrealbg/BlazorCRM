@@ -160,5 +160,47 @@ namespace Crm.Web.Tests.Authorization
 
             Assert.Equal(HttpStatusCode.OK, res.StatusCode);
         }
+
+        [Fact]
+        public async Task Jwt_Authenticated_Without_Permission_Returns_403()
+        {
+            var factory = new TestWebApplicationFactory();
+            await SeedTenantAsync(factory.Services, factory.DefaultTenantId);
+            await SeedUserAsync(factory.Services, "user@local", "User123$", isAdmin: false);
+
+            var client = factory.CreateClient();
+            client.DefaultRequestHeaders.Host = "demo.localhost";
+
+            var login = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest("user@local", "User123$"));
+            login.EnsureSuccessStatusCode();
+            var tokens = await login.Content.ReadFromJsonAsync<LoginResponse>();
+            Assert.NotNull(tokens);
+
+            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", tokens!.AccessToken);
+            var res = await client.PostAsJsonAsync("/api/companies", new { Name = "Forbidden" });
+
+            Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
+        }
+
+        [Fact]
+        public async Task Jwt_Authenticated_With_Permission_Returns_Success()
+        {
+            var factory = new TestWebApplicationFactory();
+            await SeedTenantAsync(factory.Services, factory.DefaultTenantId);
+            await SeedUserAsync(factory.Services, "admin@local", "Admin123$", isAdmin: true);
+
+            var client = factory.CreateClient();
+            client.DefaultRequestHeaders.Host = "demo.localhost";
+
+            var login = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest("admin@local", "Admin123$"));
+            login.EnsureSuccessStatusCode();
+            var tokens = await login.Content.ReadFromJsonAsync<LoginResponse>();
+            Assert.NotNull(tokens);
+
+            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", tokens!.AccessToken);
+            var res = await client.PostAsJsonAsync("/api/companies", new { Name = "Allowed" });
+
+            Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        }
     }
 }

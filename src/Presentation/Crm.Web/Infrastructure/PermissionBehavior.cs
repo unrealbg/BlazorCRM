@@ -2,6 +2,7 @@ namespace Crm.Web.Infrastructure;
 
 using System.Reflection;
 using Crm.Application.Common.Behaviors;
+using Crm.Application.Security;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -9,11 +10,11 @@ using Microsoft.AspNetCore.Http;
 public sealed class PermissionBehavior<TReq, TRes> : IPipelineBehavior<TReq, TRes>
     where TReq : notnull
 {
-    private readonly IAuthorizationService _auth;
+    private readonly IPermissionEvaluator _evaluator;
     private readonly IHttpContextAccessor _ctx;
-    public PermissionBehavior(IAuthorizationService auth, IHttpContextAccessor ctx)
+    public PermissionBehavior(IPermissionEvaluator evaluator, IHttpContextAccessor ctx)
     {
-        _auth = auth;
+        _evaluator = evaluator;
         _ctx = ctx;
     }
 
@@ -33,8 +34,7 @@ public sealed class PermissionBehavior<TReq, TRes> : IPipelineBehavior<TReq, TRe
                 throw new PermissionDeniedException(a.Policy, isAuthenticated: false);
             }
 
-            var result = await _auth.AuthorizeAsync(user, null, a.Policy);
-            if (!result.Succeeded)
+            if (!_evaluator.HasPermission(user, a.Policy))
             {
                 throw new PermissionDeniedException(a.Policy, isAuthenticated: true);
             }
