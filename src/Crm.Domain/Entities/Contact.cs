@@ -19,7 +19,7 @@ namespace Crm.Domain.Entities
         public Guid? CompanyId { get; set; }
 
         public List<string> Tags { get; set; } = new();
-        public 
+
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     }
 }
