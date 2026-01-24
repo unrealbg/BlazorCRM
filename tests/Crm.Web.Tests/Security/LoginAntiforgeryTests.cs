@@ -51,10 +51,17 @@ namespace Crm.Web.Tests.Security
             var db = scope.ServiceProvider.GetRequiredService<CrmDbContext>();
             await db.Database.EnsureCreatedAsync();
 
-            if (!await db.Tenants.AnyAsync(t => t.Slug == "demo"))
+            Guid tenantId;
+            var existingTenant = await db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == "demo");
+            if (existingTenant is null)
             {
-                db.Tenants.Add(new Crm.Domain.Entities.Tenant { Id = Guid.NewGuid(), Name = "Demo", Slug = "demo" });
+                tenantId = Guid.NewGuid();
+                db.Tenants.Add(new Crm.Domain.Entities.Tenant { Id = tenantId, Name = "Demo", Slug = "demo" });
                 await db.SaveChangesAsync();
+            }
+            else
+            {
+                tenantId = existingTenant.Id;
             }
 
             var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
@@ -65,6 +72,8 @@ namespace Crm.Web.Tests.Security
                 EmailConfirmed = true
             };
             await userManager.CreateAsync(user, "Admin123$");
+            await userManager.AddClaimAsync(user, new System.Security.Claims.Claim("tenant", tenantId.ToString()));
+            await userManager.AddClaimAsync(user, new System.Security.Claims.Claim("tenant_slug", "demo"));
         }
 
         private static async Task<string> GetAntiforgeryTokenAsync(HttpClient client)
@@ -130,6 +139,39 @@ namespace Crm.Web.Tests.Security
 
             var res = await client.PostAsync("/auth/login", new FormUrlEncodedContent(form));
             Assert.Equal(HttpStatusCode.Redirect, res.StatusCode);
+        }
+
+        [Fact]
+        public async Task Login_Sets_Tenant_Claims()
+        {
+            var factory = new TestWebApplicationFactory();
+            await SeedAsync(factory.Services);
+
+            var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+            {
+                AllowAutoRedirect = false,
+                HandleCookies = true
+            });
+            client.DefaultRequestHeaders.Host = "demo.localhost";
+
+            var token = await GetAntiforgeryTokenAsync(client);
+            var form = new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token,
+                ["Email"] = "admin@local",
+                ["Password"] = "Admin123$"
+            };
+
+            var res = await client.PostAsync("/auth/login", new FormUrlEncodedContent(form));
+            Assert.Equal(HttpStatusCode.Redirect, res.StatusCode);
+
+            var claimsRes = await client.GetAsync("/_test/claims");
+            claimsRes.EnsureSuccessStatusCode();
+            var json = await claimsRes.Content.ReadAsStringAsync();
+
+            Assert.Contains("\"type\":\"tenant\"", json, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("\"type\":\"tenant_slug\"", json, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("\"value\":\"demo\"", json, StringComparison.OrdinalIgnoreCase);
         }
     }
 }

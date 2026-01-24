@@ -1,5 +1,6 @@
 namespace Crm.Web.Tests.Security
 {
+    using System.Linq;
     using System.Net;
     using System.Net.Http.Json;
     using Crm.Contracts.Auth;
@@ -52,9 +53,16 @@ namespace Crm.Web.Tests.Security
             var db = scope.ServiceProvider.GetRequiredService<CrmDbContext>();
             await db.Database.EnsureCreatedAsync();
 
-            if (!await db.Tenants.AnyAsync(t => t.Slug == "demo"))
+            Guid demoTenantId;
+            var demoTenant = await db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == "demo");
+            if (demoTenant is null)
             {
-                db.Tenants.Add(new Crm.Domain.Entities.Tenant { Id = Guid.NewGuid(), Name = "Demo", Slug = "demo" });
+                demoTenantId = Guid.NewGuid();
+                db.Tenants.Add(new Crm.Domain.Entities.Tenant { Id = demoTenantId, Name = "Demo", Slug = "demo" });
+            }
+            else
+            {
+                demoTenantId = demoTenant.Id;
             }
 
             if (!await db.Tenants.AnyAsync(t => t.Slug == "other"))
@@ -75,6 +83,17 @@ namespace Crm.Web.Tests.Security
                     EmailConfirmed = true
                 };
                 await userManager.CreateAsync(user, "Admin123$");
+            }
+
+            var claims = await userManager.GetClaimsAsync(user);
+            if (!claims.Any(c => c.Type == "tenant" && c.Value == demoTenantId.ToString()))
+            {
+                await userManager.AddClaimAsync(user, new System.Security.Claims.Claim("tenant", demoTenantId.ToString()));
+            }
+
+            if (!claims.Any(c => c.Type == "tenant_slug" && c.Value == "demo"))
+            {
+                await userManager.AddClaimAsync(user, new System.Security.Claims.Claim("tenant_slug", "demo"));
             }
         }
 
