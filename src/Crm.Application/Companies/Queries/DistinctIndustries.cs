@@ -12,12 +12,7 @@ namespace Crm.Application.Companies.Queries
 
         public async Task<string[]> Handle(DistinctIndustries r, CancellationToken ct)
         {
-            var all = await _companies.GetAllAsync(r.Search, ct);
-            return all.Where(c => !string.IsNullOrWhiteSpace(c.Industry))
-                      .Select(c => c.Industry!)
-                      .Distinct(StringComparer.OrdinalIgnoreCase)
-                      .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
-                      .ToArray();
+            return await _companies.GetDistinctIndustriesAsync(r.Search, ct);
         }
     }
 }
