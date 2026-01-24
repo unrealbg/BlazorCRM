@@ -118,10 +118,10 @@ namespace Crm.Web.Components.Pages
                   .Select(a => new ActivityTimelineItem(
                     a.Type switch
                     {
-                        ActivityType.Call => "📞",
-                        ActivityType.Meeting => "📅",
-                        ActivityType.Email => "✉️",
-                        _ => "📝"
+                        ActivityType.Call => "Call",
+                        ActivityType.Meeting => "Meeting",
+                        ActivityType.Email => "Email",
+                        _ => "Note"
                     },
                     a.Type.ToString(),
                     a.Notes,
