@@ -43,6 +43,7 @@ The solution demonstrates real-world practices: CQRS via MediatR, multi-tenancy,
 ### Configuration (appsettings.*)
 - ConnectionStrings:DefaultConnection — Npgsql connection string
 - Jwt:Key, Jwt:Issuer, Jwt:Audience — JWT settings
+- Database:AutoMigrate — enable automatic EF migrations (true in Development/Test, false by default in Production)
 - Cors:AllowedOrigins — CORS origins for policy "maui"
 - Seed:AdminEmail / Seed:AdminPassword / Seed:AdminRoles — initial user and roles
 - Quartz:SchemaSqlPath — optional path to the Quartz SQL schema script
@@ -77,10 +78,13 @@ Example (appsettings.Development.json):
 
 Notes:
 - In Development, if the connection string is missing, a dev fallback to local PostgreSQL is used.
-- On startup: EF migrations are applied, IdentitySeeder runs (roles/admin), DemoDataSeeder runs in Development only.
+- On startup: EF migrations run in Development/Test or when Database:AutoMigrate=true; in Production it is disabled by default.
 - Data Protection keys are stored in the database.
 - Demo data seeding can be toggled with Seed:DemoData (true/false). In Development it defaults to true via appsettings.Development.json.
 - Attachments are stored on disk under the uploads root and only relative paths are persisted in the database.
+
+## Ops
+See [ops.md](ops.md) for migration workflow and production guidance.
 
 ### Quartz schema (PostgreSQL)
 Quartz uses a persistent store. On first startup the app checks for Quartz tables and, if missing, looks for a SQL script and applies it automatically.
