@@ -87,6 +87,7 @@ builder.Services.AddScoped(typeof(IPipelineBehavior<,>), typeof(PermissionBehavi
 // Tenant provider
 builder.Services.AddHttpContextAccessor();
 builder.Services.Configure<TenantOptions>(builder.Configuration.GetSection("Tenancy"));
+builder.Services.Configure<AttachmentStorageOptions>(builder.Configuration.GetSection("Attachments"));
 builder.Services.AddScoped<ITenantResolver, SubdomainTenantResolver>();
 builder.Services.AddScoped<ITenantProvider, HttpTenantProvider>();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
