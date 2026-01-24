@@ -871,41 +871,27 @@ app.MapPost("/api/auth/logout", async (
         return Results.BadRequest("Tenant could not be resolved.");
     }
 
-    if (!string.IsNullOrWhiteSpace(req.RefreshToken))
+    var all = db.RefreshTokens.Where(r => r.UserId == userId && r.TenantId == tenantContext.TenantId && !r.IsRevoked);
+    if (db.Database.IsInMemory())
     {
-        var hash = JwtTokenService.HashRefresh(req.RefreshToken);
-        var one = await db.RefreshTokens.FirstOrDefaultAsync(r => r.UserId == userId && r.TenantId == tenantContext.TenantId && r.TokenHash == hash);
-        if (one is not null)
+        var now = DateTime.UtcNow;
+        await foreach (var token in all.AsAsyncEnumerable())
         {
-            one.IsRevoked = true;
-            one.RevokedAtUtc = DateTime.UtcNow;
-            one.RevokedByIp = ctx.Connection.RemoteIpAddress?.ToString();
+            token.IsRevoked = true;
+            token.RevokedAtUtc = now;
+            token.RevokedByIp = ctx.Connection.RemoteIpAddress?.ToString();
         }
     }
     else
     {
-        var all = db.RefreshTokens.Where(r => r.UserId == userId && r.TenantId == tenantContext.TenantId && !r.IsRevoked);
-        if (db.Database.IsInMemory())
-        {
-            var now = DateTime.UtcNow;
-            await foreach (var token in all.AsAsyncEnumerable())
-            {
-                token.IsRevoked = true;
-                token.RevokedAtUtc = now;
-                token.RevokedByIp = ctx.Connection.RemoteIpAddress?.ToString();
-            }
-        }
-        else
-        {
-            await all.ExecuteUpdateAsync(s => s
-                .SetProperty(x => x.IsRevoked, true)
-                .SetProperty(x => x.RevokedAtUtc, DateTime.UtcNow)
-                .SetProperty(x => x.RevokedByIp, ctx.Connection.RemoteIpAddress?.ToString()));
-        }
+        await all.ExecuteUpdateAsync(s => s
+            .SetProperty(x => x.IsRevoked, true)
+            .SetProperty(x => x.RevokedAtUtc, DateTime.UtcNow)
+            .SetProperty(x => x.RevokedByIp, ctx.Connection.RemoteIpAddress?.ToString()));
     }
 
     await db.SaveChangesAsync();
-    return Results.Ok();
+    return Results.NoContent();
 }).RequireAuthorization();
 
 if (app.Environment.IsEnvironment("Testing"))
