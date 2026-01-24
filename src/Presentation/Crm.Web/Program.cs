@@ -92,6 +92,7 @@ builder.Services.Configure<AttachmentStorageOptions>(builder.Configuration.GetSe
 builder.Services.AddScoped<ITenantResolver, SubdomainTenantResolver>();
 builder.Services.AddScoped<ITenantContextAccessor, TenantContextAccessor>();
 builder.Services.AddScoped<ITenantProvider, HttpTenantProvider>();
+builder.Services.AddScoped<IUserTenantMembership, IdentityUserTenantMembership>();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 
 // Files
@@ -562,8 +563,9 @@ app.UseStatusCodePages(async statusContext =>
 app.UseAntiforgery();
 
 // Login (HTML form) endpoint — cookie sign-in
-app.MapPost("/auth/login", async (HttpContext ctx, IAntiforgery antiforgery, UserManager<IdentityUser> users, SignInManager<IdentityUser> signIn, ITenantContextAccessor tenantContextAccessor, IHostEnvironment env) =>
+app.MapPost("/auth/login", async (HttpContext ctx, IAntiforgery antiforgery, UserManager<IdentityUser> users, SignInManager<IdentityUser> signIn, ITenantContextAccessor tenantContextAccessor, IUserTenantMembership membership, IHostEnvironment env) =>
 {
+    var createdInThisRequest = false;
     try
     {
         await antiforgery.ValidateRequestAsync(ctx);
@@ -596,6 +598,7 @@ app.MapPost("/auth/login", async (HttpContext ctx, IAntiforgery antiforgery, Use
             if (!createResult.Succeeded)
                 return Results.Redirect("/login?e=1");
             user = created;
+            createdInThisRequest = true;
         }
         else
         {
@@ -616,6 +619,21 @@ app.MapPost("/auth/login", async (HttpContext ctx, IAntiforgery antiforgery, Use
     if (tenantContext is null)
     {
         return Results.BadRequest("Tenant could not be resolved.");
+    }
+
+    if (createdInThisRequest)
+    {
+        await users.AddClaimAsync(user, new Claim("tenant", tenantContext.TenantId.ToString()));
+        await users.AddClaimAsync(user, new Claim("tenant_slug", tenantContext.TenantSlug));
+        if (!string.IsNullOrWhiteSpace(tenantContext.TenantName))
+        {
+            await users.AddClaimAsync(user, new Claim("tenant_name", tenantContext.TenantName));
+        }
+    }
+
+    if (!await membership.IsMemberAsync(user.Id, tenantContext.TenantId, ctx.RequestAborted))
+    {
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
     }
 
     var claims = new List<Claim>
@@ -677,10 +695,12 @@ app.MapPost("/api/auth/login", async (
     SignInManager<IdentityUser> signIn,
     ITokenService tokens,
     ITenantContextAccessor tenantContextAccessor,
+    IUserTenantMembership membership,
     CrmDbContext db,
     IHostEnvironment env,
     HttpContext ctx) =>
 {
+    var createdInThisRequest = false;
     var user = await users.FindByNameAsync(req.UserName);
     if (user is null)
     {
@@ -699,6 +719,7 @@ app.MapPost("/api/auth/login", async (
             }
 
             user = created;
+            createdInThisRequest = true;
         }
         else
         {
@@ -719,6 +740,21 @@ app.MapPost("/api/auth/login", async (
     if (tenantContext is null)
     {
         return Results.BadRequest("Tenant could not be resolved.");
+    }
+
+    if (createdInThisRequest)
+    {
+        await users.AddClaimAsync(user, new Claim("tenant", tenantContext.TenantId.ToString()));
+        await users.AddClaimAsync(user, new Claim("tenant_slug", tenantContext.TenantSlug));
+        if (!string.IsNullOrWhiteSpace(tenantContext.TenantName))
+        {
+            await users.AddClaimAsync(user, new Claim("tenant_name", tenantContext.TenantName));
+        }
+    }
+
+    if (!await membership.IsMemberAsync(user.Id, tenantContext.TenantId, ctx.RequestAborted))
+    {
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
     }
 
     var roles = await users.GetRolesAsync(user);
@@ -871,6 +907,13 @@ app.MapPost("/api/auth/logout", async (
     await db.SaveChangesAsync();
     return Results.Ok();
 }).RequireAuthorization();
+
+if (app.Environment.IsEnvironment("Testing"))
+{
+    app.MapGet("/_test/claims", (HttpContext ctx) =>
+            Results.Ok(ctx.User.Claims.Select(c => new { c.Type, c.Value })))
+        .RequireAuthorization();
+}
 
 // Protected API group using MediatR
 var api = app.MapGroup("/api").RequireAuthorization().RequireCors("maui").RequireRateLimiting("api");

@@ -1,5 +1,6 @@
 namespace Crm.Web.Tests.Multitenancy
 {
+    using System.Linq;
     using System.Net;
     using System.Text.Json;
     using System.Text.RegularExpressions;
@@ -65,16 +66,33 @@ namespace Crm.Web.Tests.Multitenancy
             await db.SaveChangesAsync();
 
             var userManager = scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<Microsoft.AspNetCore.Identity.IdentityUser>>();
-            var user = await userManager.FindByEmailAsync("admin@local");
+            await EnsureUserAsync(userManager, "admin1@local", tenant1Id, "demo");
+            await EnsureUserAsync(userManager, "admin2@local", tenant2Id, "tenant2");
+        }
+
+        private static async Task EnsureUserAsync(Microsoft.AspNetCore.Identity.UserManager<Microsoft.AspNetCore.Identity.IdentityUser> userManager, string email, Guid tenantId, string tenantSlug)
+        {
+            var user = await userManager.FindByEmailAsync(email);
             if (user is null)
             {
                 user = new Microsoft.AspNetCore.Identity.IdentityUser
                 {
-                    UserName = "admin@local",
-                    Email = "admin@local",
+                    UserName = email,
+                    Email = email,
                     EmailConfirmed = true
                 };
                 await userManager.CreateAsync(user, "Admin123$");
+            }
+
+            var claims = await userManager.GetClaimsAsync(user);
+            if (!claims.Any(c => c.Type == "tenant" && c.Value == tenantId.ToString()))
+            {
+                await userManager.AddClaimAsync(user, new System.Security.Claims.Claim("tenant", tenantId.ToString()));
+            }
+
+            if (!claims.Any(c => c.Type == "tenant_slug" && c.Value == tenantSlug))
+            {
+                await userManager.AddClaimAsync(user, new System.Security.Claims.Claim("tenant_slug", tenantSlug));
             }
         }
 
@@ -93,14 +111,14 @@ namespace Crm.Web.Tests.Multitenancy
             return match.Groups[1].Value;
         }
 
-        private static async Task AuthenticateAsync(HttpClient client, string host)
+        private static async Task AuthenticateAsync(HttpClient client, string host, string email)
         {
             client.DefaultRequestHeaders.Host = host;
             var token = await GetAntiforgeryTokenAsync(client);
             var form = new Dictionary<string, string>
             {
                 ["__RequestVerificationToken"] = token,
-                ["Email"] = "admin@local",
+                ["Email"] = email,
                 ["Password"] = "Admin123$"
             };
 
@@ -121,14 +139,14 @@ namespace Crm.Web.Tests.Multitenancy
                 AllowAutoRedirect = false,
                 HandleCookies = true
             });
-            await AuthenticateAsync(client, "demo.localhost");
+            await AuthenticateAsync(client, "demo.localhost", "admin1@local");
             var t1Res = await client.GetAsync("/api/companies?page=1&pageSize=50");
             Assert.Equal(HttpStatusCode.OK, t1Res.StatusCode);
             using var t1Doc = JsonDocument.Parse(await t1Res.Content.ReadAsStringAsync());
             var t1Total = t1Doc.RootElement.GetProperty("total").GetInt32();
             Assert.Equal(1, t1Total);
 
-            await AuthenticateAsync(client, "tenant2.localhost");
+            await AuthenticateAsync(client, "tenant2.localhost", "admin2@local");
             var t2Res = await client.GetAsync("/api/companies?page=1&pageSize=50");
             Assert.Equal(HttpStatusCode.OK, t2Res.StatusCode);
             using var t2Doc = JsonDocument.Parse(await t2Res.Content.ReadAsStringAsync());
@@ -147,7 +165,7 @@ namespace Crm.Web.Tests.Multitenancy
                 AllowAutoRedirect = false,
                 HandleCookies = true
             });
-            await AuthenticateAsync(client, "demo.localhost");
+            await AuthenticateAsync(client, "demo.localhost", "admin1@local");
 
             var first = await client.GetAsync("/api/companies?page=1&pageSize=50");
             Assert.Equal(HttpStatusCode.OK, first.StatusCode);

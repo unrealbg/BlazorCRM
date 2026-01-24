@@ -1,5 +1,6 @@
 namespace Crm.Web.Tests.Authorization
 {
+    using System.Linq;
     using System.Net;
     using System.Net.Http.Json;
     using System.Text.RegularExpressions;
@@ -63,7 +64,7 @@ namespace Crm.Web.Tests.Authorization
             }
         }
 
-        private static async Task SeedUserAsync(IServiceProvider services, string email, string password, bool isAdmin)
+        private static async Task SeedUserAsync(IServiceProvider services, string email, string password, bool isAdmin, Guid tenantId, string tenantSlug)
         {
             using var scope = services.CreateScope();
             var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
@@ -79,6 +80,17 @@ namespace Crm.Web.Tests.Authorization
             {
                 user = new IdentityUser { UserName = email, Email = email, EmailConfirmed = true };
                 await userManager.CreateAsync(user, password);
+            }
+
+            var claims = await userManager.GetClaimsAsync(user);
+            if (!claims.Any(c => c.Type == "tenant" && c.Value == tenantId.ToString()))
+            {
+                await userManager.AddClaimAsync(user, new System.Security.Claims.Claim("tenant", tenantId.ToString()));
+            }
+
+            if (!claims.Any(c => c.Type == "tenant_slug" && c.Value == tenantSlug))
+            {
+                await userManager.AddClaimAsync(user, new System.Security.Claims.Claim("tenant_slug", tenantSlug));
             }
 
             if (isAdmin && !await userManager.IsInRoleAsync(user, "Admin"))
@@ -146,7 +158,7 @@ namespace Crm.Web.Tests.Authorization
         {
             var factory = new TestWebApplicationFactory();
             await SeedTenantAsync(factory.Services, factory.DefaultTenantId);
-            await SeedUserAsync(factory.Services, "user@local", "User123$", isAdmin: false);
+            await SeedUserAsync(factory.Services, "user@local", "User123$", isAdmin: false, factory.DefaultTenantId, "demo");
 
             var client = await SignInAsync(factory, "user@local", "User123$");
             var res = await client.PostAsJsonAsync("/api/companies", new { Name = "Forbidden" });
@@ -159,7 +171,7 @@ namespace Crm.Web.Tests.Authorization
         {
             var factory = new TestWebApplicationFactory();
             await SeedTenantAsync(factory.Services, factory.DefaultTenantId);
-            await SeedUserAsync(factory.Services, "admin@local", "Admin123$", isAdmin: true);
+            await SeedUserAsync(factory.Services, "admin@local", "Admin123$", isAdmin: true, factory.DefaultTenantId, "demo");
 
             var client = await SignInAsync(factory, "admin@local", "Admin123$");
             var res = await client.PostAsJsonAsync("/api/companies", new { Name = "Allowed" });
@@ -172,7 +184,7 @@ namespace Crm.Web.Tests.Authorization
         {
             var factory = new TestWebApplicationFactory();
             await SeedTenantAsync(factory.Services, factory.DefaultTenantId);
-            await SeedUserAsync(factory.Services, "user@local", "User123$", isAdmin: false);
+            await SeedUserAsync(factory.Services, "user@local", "User123$", isAdmin: false, factory.DefaultTenantId, "demo");
 
             var client = factory.CreateClient();
             client.DefaultRequestHeaders.Host = "demo.localhost";
@@ -193,7 +205,7 @@ namespace Crm.Web.Tests.Authorization
         {
             var factory = new TestWebApplicationFactory();
             await SeedTenantAsync(factory.Services, factory.DefaultTenantId);
-            await SeedUserAsync(factory.Services, "admin@local", "Admin123$", isAdmin: true);
+            await SeedUserAsync(factory.Services, "admin@local", "Admin123$", isAdmin: true, factory.DefaultTenantId, "demo");
 
             var client = factory.CreateClient();
             client.DefaultRequestHeaders.Host = "demo.localhost";

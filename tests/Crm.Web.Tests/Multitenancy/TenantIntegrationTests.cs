@@ -83,6 +83,8 @@ namespace Crm.Web.Tests.Multitenancy
                 EmailConfirmed = true
             };
             await userManager.CreateAsync(user, "Admin123$");
+            await userManager.AddClaimAsync(user, new System.Security.Claims.Claim("tenant", tenant1Id.ToString()));
+            await userManager.AddClaimAsync(user, new System.Security.Claims.Claim("tenant_slug", "demo"));
         }
 
         private static async Task<string> GetAntiforgeryTokenAsync(HttpClient client)
