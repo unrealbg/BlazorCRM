@@ -8,18 +8,25 @@ namespace Crm.Web.Infrastructure
 
         public TenantResolutionMiddleware(RequestDelegate next) => _next = next;
 
-        public async Task InvokeAsync(HttpContext ctx, ITenantResolver resolver, ILogger<TenantResolutionMiddleware> logger)
+        public async Task InvokeAsync(HttpContext ctx, ITenantResolver resolver, ITenantContextAccessor accessor, ILogger<TenantResolutionMiddleware> logger)
         {
-            var resolution = resolver.Resolve();
-            if (!resolution.IsResolved)
+            TenantContext tenantContext;
+            try
             {
-                logger.LogWarning("Tenant resolution failed for host {Host}: {Reason}", ctx.Request.Host.Host, resolution.FailureReason);
+                tenantContext = await resolver.ResolveAsync(ctx);
+            }
+            catch (TenantResolutionException ex)
+            {
+                logger.LogWarning("Tenant resolution failed for host {Host}: {Reason}", ctx.Request.Host.Host, ex.Message);
                 ctx.Response.StatusCode = StatusCodes.Status404NotFound;
                 await ctx.Response.WriteAsJsonAsync(new { error = "tenant_unresolved" });
                 return;
             }
 
-            var cacheKey = resolution.TenantSlug ?? resolution.TenantId.ToString("N");
+            ctx.Items[TenantContextKeys.Context] = tenantContext;
+            accessor.Current = tenantContext;
+
+            var cacheKey = tenantContext.TenantSlug;
             ctx.Request.Headers["X-Tenant"] = cacheKey;
 
             await _next(ctx);
