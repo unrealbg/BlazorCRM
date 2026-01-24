@@ -287,14 +287,17 @@ builder.Services.AddResponseCompression(options =>
 // Output caching for GET endpoints
 builder.Services.AddOutputCache(o =>
 {
-    o.AddPolicy("companies", b => b
-        .Expire(TimeSpan.FromSeconds(30))
-        .SetVaryByQuery("search", "industry", "sort", "asc", "page", "pageSize")
-        .SetVaryByHeader("X-Tenant"));
-    o.AddPolicy("industries", b => b
-        .Expire(TimeSpan.FromMinutes(5))
-        .SetVaryByQuery("search")
-        .SetVaryByHeader("X-Tenant"));
+    o.AddPolicy("companies", new TenantScopedOutputCachePolicy(
+        TimeSpan.FromSeconds(30),
+        "search",
+        "industry",
+        "sort",
+        "asc",
+        "page",
+        "pageSize"));
+    o.AddPolicy("industries", new TenantScopedOutputCachePolicy(
+        TimeSpan.FromMinutes(5),
+        "search"));
 });
 
 // EF-backed services

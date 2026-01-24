@@ -26,9 +26,6 @@ namespace Crm.Web.Infrastructure
             ctx.Items[TenantContextKeys.Context] = tenantContext;
             accessor.Current = tenantContext;
 
-            var cacheKey = tenantContext.TenantSlug;
-            ctx.Request.Headers["X-Tenant"] = cacheKey;
-
             await _next(ctx);
         }
     }
