@@ -15,7 +15,9 @@ namespace Crm.Infrastructure.Identity
         private sealed class IdentitySeederLog { }
         private sealed class SeedTenantProvider : ITenantProvider
         {
-            public Guid TenantId => Guid.Empty;
+            public SeedTenantProvider(Guid tenantId) => TenantId = tenantId;
+
+            public Guid TenantId { get; }
         }
 
         public static async Task SeedAsync(IServiceProvider services, IConfiguration configuration)
@@ -25,12 +27,13 @@ namespace Crm.Infrastructure.Identity
             var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
             var logger = scope.ServiceProvider.GetRequiredService<ILogger<IdentitySeederLog>>();
             var options = scope.ServiceProvider.GetRequiredService<IOptions<TenantOptions>>().Value;
-            var db = scope.ServiceProvider.GetRequiredService<CrmDbContext>();
+            var dbOptions = scope.ServiceProvider.GetRequiredService<DbContextOptions<CrmDbContext>>();
 
             var tenantSlug = string.IsNullOrWhiteSpace(options.DefaultTenantSlug) ? "demo" : options.DefaultTenantSlug;
             var tenantName = string.IsNullOrWhiteSpace(options.DefaultTenantName) ? "Demo" : options.DefaultTenantName;
 
-            var tenant = await db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == tenantSlug);
+            await using var seedDb = new CrmDbContext(dbOptions, new SeedTenantProvider(Guid.Empty));
+            var tenant = await seedDb.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == tenantSlug);
             if (tenant is null)
             {
                 tenant = new Tenant
@@ -39,8 +42,6 @@ namespace Crm.Infrastructure.Identity
                     Name = tenantName,
                     Slug = tenantSlug
                 };
-                var dbOptions = scope.ServiceProvider.GetRequiredService<DbContextOptions<CrmDbContext>>();
-                await using var seedDb = new CrmDbContext(dbOptions, new SeedTenantProvider());
                 await seedDb.Tenants.AddAsync(tenant);
                 await seedDb.SaveChangesAsync();
                 logger.LogInformation("Seeded tenant {TenantId} ({TenantName}) for identity.", tenant.Id, tenantName);
@@ -49,6 +50,9 @@ namespace Crm.Infrastructure.Identity
             {
                 logger.LogInformation("Tenant {TenantId} already exists. Skipping tenant seed for identity.", tenant.Id);
             }
+
+            var accessor = scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>();
+            accessor.Current = new TenantContext(tenant.Id, tenant.Slug, tenant.Name);
 
             var rolesCfg = configuration.GetSection("Seed:Roles").GetChildren().Select(c => c.Value!).Where(v => !string.IsNullOrWhiteSpace(v));
             var roles = rolesCfg
@@ -114,6 +118,7 @@ namespace Crm.Infrastructure.Identity
             {
                 await userManager.AddClaimAsync(admin, new System.Security.Claims.Claim("tenant", tenant.Id.ToString()));
             }
+
             if (!claims.Any(c => c.Type == "tenant_slug" && c.Value == tenant.Slug))
             {
                 await userManager.AddClaimAsync(admin, new System.Security.Claims.Claim("tenant_slug", tenant.Slug));

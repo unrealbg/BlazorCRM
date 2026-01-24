@@ -7,6 +7,7 @@ namespace Crm.Web.Tests.Security
     using Microsoft.AspNetCore.Identity;
     using Microsoft.AspNetCore.Mvc.Testing;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -15,6 +16,9 @@ namespace Crm.Web.Tests.Security
     {
         private sealed class TestWebApplicationFactory : WebApplicationFactory<Program>
         {
+            private static readonly InMemoryDatabaseRoot DbRoot = new();
+            private readonly string _dbName = $"crm-test-{Guid.NewGuid()}";
+
             protected override void ConfigureWebHost(IWebHostBuilder builder)
             {
                 builder.UseEnvironment("Testing");
@@ -36,7 +40,7 @@ namespace Crm.Web.Tests.Security
                 builder.ConfigureServices(services =>
                 {
                     services.RemoveAll<DbContextOptions<CrmDbContext>>();
-                    services.AddDbContext<CrmDbContext>(o => o.UseInMemoryDatabase($"crm-test-{Guid.NewGuid()}"));
+                    services.AddDbContext<CrmDbContext>(o => o.UseInMemoryDatabase(_dbName, DbRoot));
                 });
             }
         }
@@ -71,7 +75,9 @@ namespace Crm.Web.Tests.Security
             var html = await res.Content.ReadAsStringAsync();
             var match = Regex.Match(html, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"", RegexOptions.IgnoreCase);
             if (!match.Success)
+            {
                 throw new InvalidOperationException("Antiforgery token was not found in the login page.");
+            }
 
             return match.Groups[1].Value;
         }

@@ -6,8 +6,8 @@ namespace Crm.Web.Tests.Multitenancy
     using Crm.Infrastructure.Persistence;
     using Microsoft.AspNetCore.Http;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.Hosting;
-    using Microsoft.Extensions.Options;
 
     public class TenantResolutionTests
     {
@@ -24,7 +24,7 @@ namespace Crm.Web.Tests.Multitenancy
             public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; } = default!;
         }
 
-        private static SubdomainTenantResolver CreateResolver(string host, string environment, string defaultSlug = "demo", params Tenant[] tenants)
+        private static (SubdomainTenantResolver Resolver, HttpContext Context) CreateResolver(string host, string environment, string defaultSlug = "demo", params Tenant[] tenants)
         {
             var options = new DbContextOptionsBuilder<CrmDbContext>()
                 .UseInMemoryDatabase($"tenant-test-{Guid.NewGuid()}")
@@ -33,64 +33,60 @@ namespace Crm.Web.Tests.Multitenancy
             db.Tenants.AddRange(tenants);
             db.SaveChanges();
 
-            var accessor = new HttpContextAccessor
-            {
-                HttpContext = new DefaultHttpContext()
-            };
-            accessor.HttpContext!.Request.Host = new HostString(host);
+            var context = new DefaultHttpContext();
+            context.Request.Host = new HostString(host);
 
             var env = new TestHostEnvironment { EnvironmentName = environment };
-            var tenantOptions = Options.Create(new TenantOptions
-            {
-                DefaultTenantSlug = defaultSlug,
-                DefaultTenantName = "Demo",
-                BaseDomains = new[] { "crm.example.com" }
-            });
+            var config = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Tenancy:DefaultTenantSlug"] = defaultSlug,
+                    ["Tenancy:DefaultTenantName"] = "Demo",
+                    ["Tenancy:BaseDomain"] = "crm.yourdomain.com",
+                    ["Tenancy:DevHostSuffix"] = "localhost"
+                })
+                .Build();
 
-            return new SubdomainTenantResolver(accessor, db, tenantOptions, env);
+            return (new SubdomainTenantResolver(options, config, env), context);
         }
 
         [Fact]
-        public void Resolve_Subdomain_Localhost()
-        {
-            var tenant = new Tenant { Id = Guid.NewGuid(), Name = "Tenant 1", Slug = "tenant1" };
-            var resolver = CreateResolver("tenant1.localhost", Environments.Production, tenants: tenant);
-
-            var resolved = resolver.Resolve();
-            Assert.True(resolved.IsResolved);
-            Assert.Equal(tenant.Id, resolved.TenantId);
-            Assert.Equal("tenant1", resolved.TenantSlug);
-        }
-
-        [Fact]
-        public void Resolve_Subdomain_BaseDomain()
-        {
-            var tenant = new Tenant { Id = Guid.NewGuid(), Name = "Tenant 1", Slug = "tenant1" };
-            var resolver = CreateResolver("tenant1.crm.example.com", Environments.Production, tenants: tenant);
-
-            var resolved = resolver.Resolve();
-            Assert.True(resolved.IsResolved);
-            Assert.Equal(tenant.Id, resolved.TenantId);
-        }
-
-        [Fact]
-        public void Resolve_NoSubdomain_Development_UsesDefault()
+        public async Task Resolve_Subdomain_Localhost()
         {
             var tenant = new Tenant { Id = Guid.NewGuid(), Name = "Demo", Slug = "demo" };
-            var resolver = CreateResolver("localhost", Environments.Development, tenants: tenant);
+            var (resolver, context) = CreateResolver("demo.localhost", Environments.Production, tenants: tenant);
 
-            var resolved = resolver.Resolve();
-            Assert.True(resolved.IsResolved);
+            var resolved = await resolver.ResolveAsync(context);
+            Assert.Equal(tenant.Id, resolved.TenantId);
             Assert.Equal("demo", resolved.TenantSlug);
         }
 
         [Fact]
-        public void Resolve_NoSubdomain_Production_Fails()
+        public async Task Resolve_Subdomain_BaseDomain()
         {
-            var resolver = CreateResolver("localhost", Environments.Production);
+            var tenant = new Tenant { Id = Guid.NewGuid(), Name = "Demo", Slug = "demo" };
+            var (resolver, context) = CreateResolver("demo.crm.yourdomain.com", Environments.Production, tenants: tenant);
 
-            var resolved = resolver.Resolve();
-            Assert.False(resolved.IsResolved);
+            var resolved = await resolver.ResolveAsync(context);
+            Assert.Equal(tenant.Id, resolved.TenantId);
+        }
+
+        [Fact]
+        public async Task Resolve_NoSubdomain_Development_UsesDefault()
+        {
+            var tenant = new Tenant { Id = Guid.NewGuid(), Name = "Demo", Slug = "demo" };
+            var (resolver, context) = CreateResolver("localhost", Environments.Development, tenants: tenant);
+
+            var resolved = await resolver.ResolveAsync(context);
+            Assert.Equal("demo", resolved.TenantSlug);
+        }
+
+        [Fact]
+        public async Task Resolve_NoSubdomain_Production_Fails()
+        {
+            var (resolver, context) = CreateResolver("localhost", Environments.Production);
+
+            await Assert.ThrowsAsync<TenantResolutionException>(() => resolver.ResolveAsync(context));
         }
     }
 }

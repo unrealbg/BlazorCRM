@@ -13,19 +13,21 @@ namespace Crm.Infrastructure.Seeding
         private sealed class DemoDataSeederLog { }
         private sealed class SeedTenantProvider : ITenantProvider
         {
-            public Guid TenantId => Guid.Empty;
+            public SeedTenantProvider(Guid tenantId) => TenantId = tenantId;
+            public Guid TenantId { get; }
         }
 
         public static async Task SeedAsync(IServiceProvider sp, CancellationToken ct = default)
         {
-            var db = sp.GetRequiredService<CrmDbContext>();
             var logger = sp.GetRequiredService<ILogger<DemoDataSeederLog>>();
             var options = sp.GetRequiredService<IOptions<TenantOptions>>().Value;
+            var dbOptions = sp.GetRequiredService<DbContextOptions<CrmDbContext>>();
 
             var tenantSlug = string.IsNullOrWhiteSpace(options.DefaultTenantSlug) ? "demo" : options.DefaultTenantSlug;
             var tenantName = string.IsNullOrWhiteSpace(options.DefaultTenantName) ? "Demo" : options.DefaultTenantName;
 
-            var tenant = await db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == tenantSlug, ct);
+            await using var seedDb = new CrmDbContext(dbOptions, new SeedTenantProvider(Guid.Empty));
+            var tenant = await seedDb.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == tenantSlug, ct);
             if (tenant is null)
             {
                 tenant = new Tenant
@@ -34,8 +36,6 @@ namespace Crm.Infrastructure.Seeding
                     Name = tenantName,
                     Slug = tenantSlug
                 };
-                var dbOptions = sp.GetRequiredService<DbContextOptions<CrmDbContext>>();
-                await using var seedDb = new CrmDbContext(dbOptions, new SeedTenantProvider());
                 await seedDb.Tenants.AddAsync(tenant, ct);
                 await seedDb.SaveChangesAsync(ct);
                 logger.LogInformation("Seeded tenant {TenantId} ({TenantName}).", tenant.Id, tenantName);
@@ -46,6 +46,8 @@ namespace Crm.Infrastructure.Seeding
             }
 
             var tenantId = tenant.Id;
+
+            await using var db = new CrmDbContext(dbOptions, new SeedTenantProvider(tenantId));
 
             var pipeline = await db.Pipelines.FirstOrDefaultAsync(p => p.TenantId == tenantId && p.Name == "Sales", ct);
             if (pipeline is null)

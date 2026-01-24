@@ -231,13 +231,16 @@ namespace Crm.Infrastructure.Persistence
 
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
-            var tenantIdCurrent = _tenantProvider.TenantId;
+            var tenantOwnedEntries = ChangeTracker.Entries<ITenantOwned>()
+                .Where(entry => entry.State == EntityState.Added && entry.Entity.TenantId == Guid.Empty)
+                .ToList();
 
-            foreach (var entry in ChangeTracker.Entries<ITenantOwned>())
+            if (tenantOwnedEntries.Count > 0)
             {
-                if (entry.State == EntityState.Added && entry.Entity.TenantId == Guid.Empty)
+                var tenantIdCurrentForNew = _tenantProvider.TenantId;
+                foreach (var entry in tenantOwnedEntries)
                 {
-                    entry.Entity.TenantId = tenantIdCurrent;
+                    entry.Entity.TenantId = tenantIdCurrentForNew;
                 }
             }
 
@@ -250,6 +253,20 @@ namespace Crm.Infrastructure.Persistence
             }
 
             ChangeTracker.DetectChanges();
+            Guid tenantIdCurrent = Guid.Empty;
+            var needsAuditFallbackTenant = ChangeTracker.Entries()
+                .Any(e => e.Entity is BaseEntity && e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted && e.Entity is not ITenantOwned);
+            if (needsAuditFallbackTenant)
+            {
+                try
+                {
+                    tenantIdCurrent = _tenantProvider.TenantId;
+                }
+                catch
+                {
+                    tenantIdCurrent = Guid.Empty;
+                }
+            }
             var now = DateTime.UtcNow;
             var audits = new List<AuditEntry>();
             foreach (var entry in ChangeTracker.Entries().Where(e => e.Entity is BaseEntity && e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted))

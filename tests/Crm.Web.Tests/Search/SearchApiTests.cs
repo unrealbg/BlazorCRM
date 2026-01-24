@@ -10,6 +10,7 @@ namespace Crm.Web.Tests.Search
     using Microsoft.AspNetCore.Identity;
     using Microsoft.AspNetCore.Mvc.Testing;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -20,6 +21,7 @@ namespace Crm.Web.Tests.Search
         {
             public Guid DefaultTenantId { get; } = Guid.Parse("11111111-1111-1111-1111-111111111111");
             public Guid OtherTenantId { get; } = Guid.Parse("22222222-2222-2222-2222-222222222222");
+            private static readonly InMemoryDatabaseRoot DbRoot = new();
             private readonly string _dbName = $"crm-test-{Guid.NewGuid()}";
 
             protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -43,7 +45,7 @@ namespace Crm.Web.Tests.Search
                 builder.ConfigureServices(services =>
                 {
                     services.RemoveAll<DbContextOptions<CrmDbContext>>();
-                    services.AddDbContext<CrmDbContext>(o => o.UseInMemoryDatabase(_dbName));
+                    services.AddDbContext<CrmDbContext>(o => o.UseInMemoryDatabase(_dbName, DbRoot));
                 });
             }
         }
@@ -84,7 +86,9 @@ namespace Crm.Web.Tests.Search
             var html = await res.Content.ReadAsStringAsync();
             var match = Regex.Match(html, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"", RegexOptions.IgnoreCase);
             if (!match.Success)
+            {
                 throw new InvalidOperationException("Antiforgery token was not found in the login page.");
+            }
 
             return match.Groups[1].Value;
         }
@@ -108,7 +112,9 @@ namespace Crm.Web.Tests.Search
 
             var login = await client.PostAsync("/auth/login", new FormUrlEncodedContent(form));
             if (login.StatusCode != HttpStatusCode.Redirect)
+            {
                 throw new InvalidOperationException("Login failed in test setup.");
+            }
 
             return client;
         }

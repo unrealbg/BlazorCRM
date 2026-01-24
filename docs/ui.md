@@ -3,6 +3,7 @@
 This document describes the base UI tokens and components used across the CRM UI. The goal is consistent spacing, typography, and interaction states while staying compatible with Tailwind and MudBlazor.
 
 ## Design tokens
+
 Tokens live in [src/Presentation/Crm.Web/wwwroot/css/app.css](../src/Presentation/Crm.Web/wwwroot/css/app.css).
 
 - Spacing: `--space-1` to `--space-6`
@@ -11,6 +12,7 @@ Tokens live in [src/Presentation/Crm.Web/wwwroot/css/app.css](../src/Presentatio
 - Colors: `--color-surface`, `--color-text`, `--color-brand`, `--color-accent`, `--color-success`, `--color-warning`, `--color-danger`
 
 ## Base components
+
 Components live in [src/Presentation/Crm.UI/Components/Base](../src/Presentation/Crm.UI/Components/Base).
 
 - `UiCard`: Surface container.
