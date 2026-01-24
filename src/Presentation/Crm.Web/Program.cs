@@ -270,7 +270,8 @@ builder.Services.AddRateLimiter(o => o.AddFixedWindowLimiter(policyName: "api", 
 
 builder.Services
     .AddHealthChecks()
-    .AddDbContextCheck<CrmDbContext>("db");
+    .AddDbContextCheck<CrmDbContext>("db")
+    .AddCheck<DbMigrationsHealthCheck>("db_migrations");
 
 // Response compression
 builder.Services.AddResponseCompression(options =>
@@ -385,19 +386,48 @@ app.Use(async (ctx, next) =>
 });
 
 // Apply migrations and seed identity + demo data
-if (!app.Environment.IsEnvironment("Testing"))
 {
-    using (var scope = app.Services.CreateScope())
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<CrmDbContext>();
+    var autoMigrateFlag = builder.Configuration.GetValue<bool?>("Database:AutoMigrate");
+    var autoMigrate = app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing") || autoMigrateFlag == true;
+
+    if (db.Database.IsInMemory())
     {
-        var db = scope.ServiceProvider.GetRequiredService<CrmDbContext>();
+        if (autoMigrate)
+        {
+            await db.Database.EnsureCreatedAsync();
+        }
+    }
+    else if (autoMigrate)
+    {
         await db.Database.MigrateAsync();
+    }
+    else
+    {
+        if (!await db.Database.CanConnectAsync())
+        {
+            app.Logger.LogCritical("Database connection failed and auto-migrate is disabled. Set Database:AutoMigrate=true to enable automatic migrations.");
+            throw new InvalidOperationException("Database connection failed.");
+        }
+
+        var pending = await db.Database.GetPendingMigrationsAsync();
+        if (pending.Any())
+        {
+            app.Logger.LogCritical("Database schema is out of date and auto-migrate is disabled. Pending migrations: {Migrations}", string.Join(", ", pending));
+            throw new InvalidOperationException("Database schema is out of date.");
+        }
+    }
+
+    if (!app.Environment.IsEnvironment("Testing"))
+    {
         await EnsureDataProtectionSchemaAsync(configuredConnStr, app.Logger);
         await IdentitySeeder.SeedAsync(app.Services, builder.Configuration);
 
-            var demoDataEnabled = builder.Configuration.GetValue<bool?>("Seed:DemoData") ?? app.Environment.IsDevelopment();
-            if (demoDataEnabled)
-            {
-                await DemoDataSeeder.SeedAsync(scope.ServiceProvider);
+        var demoDataEnabled = builder.Configuration.GetValue<bool?>("Seed:DemoData") ?? app.Environment.IsDevelopment();
+        if (demoDataEnabled)
+        {
+            await DemoDataSeeder.SeedAsync(scope.ServiceProvider);
         }
 
         // Keeping post-build ensure as no-op if already created
