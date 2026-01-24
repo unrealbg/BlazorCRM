@@ -5,6 +5,7 @@ namespace Crm.Web.Tests.Security
     using System.Net.Http.Json;
     using Crm.Contracts.Auth;
     using Crm.Infrastructure.Persistence;
+    using Crm.Infrastructure.Security;
     using Microsoft.AspNetCore.Hosting;
     using Microsoft.AspNetCore.Identity;
     using Microsoft.AspNetCore.Mvc.Testing;
@@ -124,6 +125,23 @@ namespace Crm.Web.Tests.Security
             Assert.NotNull(refreshRes);
             Assert.NotEqual(loginRes.RefreshToken, refreshRes!.RefreshToken);
 
+            await using (var scope = factory.Services.CreateAsyncScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<CrmDbContext>();
+                var oldHash = JwtTokenService.HashRefresh(loginRes.RefreshToken);
+                var oldToken = await db.RefreshTokens.FirstOrDefaultAsync(r => r.TokenHash == oldHash);
+                Assert.NotNull(oldToken);
+                Assert.True(oldToken!.IsRevoked);
+                Assert.NotNull(oldToken.RevokedAtUtc);
+                Assert.False(string.IsNullOrWhiteSpace(oldToken.ReplacedByHash));
+
+                var newHash = JwtTokenService.HashRefresh(refreshRes.RefreshToken);
+                var newToken = await db.RefreshTokens.FirstOrDefaultAsync(r => r.TokenHash == newHash);
+                Assert.NotNull(newToken);
+                Assert.False(newToken!.IsRevoked);
+                Assert.Null(newToken.ReplacedByHash);
+            }
+
             var reuse = await client.PostAsJsonAsync("/api/auth/refresh", new RefreshRequest(loginRes.RefreshToken));
             Assert.Equal(HttpStatusCode.Unauthorized, reuse.StatusCode);
 
@@ -147,6 +165,32 @@ namespace Crm.Web.Tests.Security
             var otherClient = CreateClientForHost(factory, "other.localhost");
             var refresh = await otherClient.PostAsJsonAsync("/api/auth/refresh", new RefreshRequest(loginRes!.RefreshToken));
             Assert.Equal(HttpStatusCode.Unauthorized, refresh.StatusCode);
+        }
+
+        [Fact]
+        public async Task Logout_Revokes_Tenant_Tokens()
+        {
+            var factory = new TestWebApplicationFactory();
+            await SeedAsync(factory.Services);
+
+            var client = CreateClientForHost(factory, "demo.localhost");
+            var login = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest("admin@local", "Admin123$"));
+            login.EnsureSuccessStatusCode();
+
+            var loginRes = await login.Content.ReadFromJsonAsync<LoginResponse>();
+            Assert.NotNull(loginRes);
+
+            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", loginRes!.AccessToken);
+            var logout = await client.PostAsJsonAsync("/api/auth/logout", new LogoutRequest(null));
+            Assert.Equal(HttpStatusCode.NoContent, logout.StatusCode);
+
+            await using var scope = factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<CrmDbContext>();
+            var hash = JwtTokenService.HashRefresh(loginRes.RefreshToken);
+            var token = await db.RefreshTokens.FirstOrDefaultAsync(r => r.TokenHash == hash);
+            Assert.NotNull(token);
+            Assert.True(token!.IsRevoked);
+            Assert.NotNull(token.RevokedAtUtc);
         }
     }
 }

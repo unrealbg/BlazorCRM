@@ -597,8 +597,10 @@ namespace Crm.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ExpiresAtUtc");
 
-                    b.HasIndex("UserId", "TokenHash")
+                    b.HasIndex("TokenHash")
                         .IsUnique();
+
+                    b.HasIndex("UserId", "TenantId");
 
                     b.HasIndex("UserId", "TenantId", "IsRevoked");
 
