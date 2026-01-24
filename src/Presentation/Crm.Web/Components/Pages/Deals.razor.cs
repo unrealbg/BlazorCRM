@@ -79,9 +79,9 @@ namespace Crm.Web.Components.Pages
                 _stageNameMap = _stages.ToDictionary(s => s.Id, s => s.Name);
 
                 _dealsByStage.Clear();
-                var deals = _selectedPipelineId == Guid.Empty
-                  ? Enumerable.Empty<Deal>()
-                  : await DealService.GetAllAsync(pipelineId: _selectedPipelineId);
+                                var deals = _selectedPipelineId == Guid.Empty
+                                    ? Enumerable.Empty<Deal>()
+                                    : (await DealService.GetPageAsync(pipelineId: _selectedPipelineId, page: 1, pageSize: 200)).Items;
 
                 foreach (var g in deals.GroupBy(d => d.StageId))
                 {
@@ -112,10 +112,9 @@ namespace Crm.Web.Components.Pages
             _loadingTimeline = true;
             try
             {
-                var activities = await ActivityService.GetAllAsync(dealId);
-                _timeline = activities
-                  .OrderByDescending(a => a.DueAt)
-                  .Select(a => new ActivityTimelineItem(
+                                var activities = await ActivityService.GetPageAsync(dealId, page: 1, pageSize: 50);
+                                _timeline = activities.Items
+                                    .Select(a => new ActivityTimelineItem(
                     a.Type switch
                     {
                         ActivityType.Call => "Call",

@@ -28,7 +28,7 @@
 
   @if (_loading)
   {
-    <div>Loading…</div>
+    <div>Loading...</div>
   }
   else if (!_items.Any())
   {
@@ -106,16 +106,17 @@
   private async Task Reload()
   {
     _loading = true;
-    var data = await Service.GetAllAsync(RelatedId);
-
+    ActivityType? type = null;
     if (!string.IsNullOrEmpty(_filterType) && Enum.TryParse<ActivityType>(_filterType, out var ft))
-      data = data.Where(a => a.Type == ft);
+      type = ft;
 
+    ActivityStatus? status = null;
     if (!string.IsNullOrEmpty(_filterStatus) && Enum.TryParse<ActivityStatus>(_filterStatus, out var fs))
-      data = data.Where(a => a.Status == fs);
+      status = fs;
 
-    _items = data
-      .OrderByDescending(a => a.DueAt ?? DateTime.MaxValue)
+    var res = await Service.GetPageAsync(RelatedId, type, status, page: 1, pageSize: 50);
+
+    _items = res.Items
       .Select(a => new ActivityTimelineItem(
         Icon: a.Type switch { ActivityType.Call => "??", ActivityType.Meeting => "??", ActivityType.Email => "??", _ => "??" },
         Title: a.Notes ?? a.Type.ToString(),
