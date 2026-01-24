@@ -13,6 +13,7 @@ namespace Crm.Web.Tests.Multitenancy
     using Microsoft.AspNetCore.Identity;
     using Microsoft.AspNetCore.Mvc.Testing;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -23,6 +24,7 @@ namespace Crm.Web.Tests.Multitenancy
         {
             public Guid Tenant1Id { get; } = Guid.Parse("11111111-1111-1111-1111-111111111111");
             public Guid Tenant2Id { get; } = Guid.Parse("22222222-2222-2222-2222-222222222222");
+            private static readonly InMemoryDatabaseRoot DbRoot = new();
             private readonly string _dbName = $"crm-test-{Guid.NewGuid()}";
 
             protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -35,6 +37,8 @@ namespace Crm.Web.Tests.Multitenancy
                     {
                         ["Tenancy:DefaultTenantSlug"] = "demo",
                         ["Tenancy:DefaultTenantName"] = "Demo",
+                        ["Tenancy:BaseDomain"] = "crm.yourdomain.com",
+                        ["Tenancy:DevHostSuffix"] = "localhost",
                         ["Jwt:Key"] = "TEST_KEY_01234567890123456789012345678901",
                         ["Jwt:Issuer"] = "BlazorCrm",
                         ["Jwt:Audience"] = "BlazorCrmClients"
@@ -46,7 +50,7 @@ namespace Crm.Web.Tests.Multitenancy
                 builder.ConfigureServices(services =>
                 {
                     services.RemoveAll<DbContextOptions<CrmDbContext>>();
-                    services.AddDbContext<CrmDbContext>(o => o.UseInMemoryDatabase(_dbName));
+                    services.AddDbContext<CrmDbContext>(o => o.UseInMemoryDatabase(_dbName, DbRoot));
                 });
             }
         }
@@ -59,7 +63,7 @@ namespace Crm.Web.Tests.Multitenancy
 
             if (!await db.Tenants.AnyAsync(t => t.Id == tenant1Id))
             {
-                db.Tenants.Add(new Tenant { Id = tenant1Id, Name = "Tenant 1", Slug = "tenant1" });
+                db.Tenants.Add(new Tenant { Id = tenant1Id, Name = "Demo", Slug = "demo" });
             }
 
             if (!await db.Tenants.AnyAsync(t => t.Id == tenant2Id))
@@ -89,7 +93,9 @@ namespace Crm.Web.Tests.Multitenancy
             var html = await res.Content.ReadAsStringAsync();
             var match = Regex.Match(html, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"", RegexOptions.IgnoreCase);
             if (!match.Success)
+            {
                 throw new InvalidOperationException("Antiforgery token was not found in the login page.");
+            }
 
             return match.Groups[1].Value;
         }
@@ -105,7 +111,7 @@ namespace Crm.Web.Tests.Multitenancy
                 AllowAutoRedirect = false,
                 HandleCookies = true
             });
-            client.DefaultRequestHeaders.Host = "tenant1.localhost";
+            client.DefaultRequestHeaders.Host = "demo.localhost";
 
             var token = await GetAntiforgeryTokenAsync(client);
             var form = new Dictionary<string, string>
@@ -133,7 +139,7 @@ namespace Crm.Web.Tests.Multitenancy
             await SeedAsync(factory.Services, factory.Tenant1Id, factory.Tenant2Id);
 
             var client = factory.CreateClient();
-            client.DefaultRequestHeaders.Host = "tenant1.localhost";
+            client.DefaultRequestHeaders.Host = "demo.localhost";
 
             var login = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest("admin@local", "Admin123$"));
             Assert.Equal(HttpStatusCode.OK, login.StatusCode);
@@ -148,7 +154,7 @@ namespace Crm.Web.Tests.Multitenancy
             Assert.Equal(factory.Tenant1Id.ToString(), tenantClaim!.Value);
             var tenantSlug = jwt.Claims.FirstOrDefault(c => c.Type == "tenant_slug");
             Assert.NotNull(tenantSlug);
-            Assert.Equal("tenant1", tenantSlug!.Value);
+            Assert.Equal("demo", tenantSlug!.Value);
 
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             var res = await client.GetAsync("/api/companies?page=1&pageSize=50");
