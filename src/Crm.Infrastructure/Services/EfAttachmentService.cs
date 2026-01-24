@@ -22,8 +22,14 @@ namespace Crm.Infrastructure.Services
 
         public async Task<Attachment> UploadAsync(Stream content, string fileName, string contentType, RelatedToType relatedTo, Guid? relatedId, CancellationToken ct = default)
         {
-            var path = await _storage.SaveAsync(content, fileName, contentType, _tenant.TenantId, ct);
-            var entity = new Attachment { Id = Guid.NewGuid(), FileName = fileName, Size = content.Length, BlobRef = path, ContentType = contentType, RelatedTo = relatedTo, RelatedId = relatedId, TenantId = _tenant.TenantId };
+            var tenantSlug = await _db.Tenants.AsNoTracking()
+                .Where(t => t.Id == _tenant.TenantId)
+                .Select(t => t.Slug)
+                .FirstOrDefaultAsync(ct);
+
+            var path = await _storage.SaveAsync(content, fileName, contentType, _tenant.TenantId, tenantSlug ?? string.Empty, ct);
+            var size = content.CanSeek ? content.Length : 0;
+            var entity = new Attachment { Id = Guid.NewGuid(), FileName = fileName, Size = size, BlobRef = path, ContentType = contentType, RelatedTo = relatedTo, RelatedId = relatedId, TenantId = _tenant.TenantId };
             await _db.Attachments.AddAsync(entity, ct);
             await _db.SaveChangesAsync(ct);
             return entity;

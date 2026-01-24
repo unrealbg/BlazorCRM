@@ -6,7 +6,7 @@
   <EditForm Model="this" OnValidSubmit="SaveAsync">
     <DataAnnotationsValidator />
     <ValidationSummary />
-    <div class="grid grid-cols-1 md:grid-cols-5 gap-2">
+    <div class="activity-editor grid grid-cols-1 md:grid-cols-5 gap-2">
       <select class="select" @bind="_type">
         @foreach (var t in Enum.GetValues<ActivityType>())
         {

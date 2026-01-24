@@ -1,9 +1,15 @@
 <div class="fixed inset-0 z-50 @(_open?"":"hidden")">
   <div class="absolute inset-0 bg-black/40" @onclick="Close"></div>
-  <div class="relative mx-auto mt-20 w-full max-w-xl card p-4">
+  <div class="crm-modal flex min-h-full items-center justify-center p-4">
+    <div class="crm-modal-dialog w-full card p-4">
     <div class="flex items-center justify-between pb-2 border-b border-white/30 dark:border-white/10">
       <h2 class="text-lg font-semibold">@Title</h2>
-      <button class="h-8 w-8 rounded-lg hover:bg-white/60 dark:hover:bg-slate-700/50" @onclick="Close">?</button>
+      <button type="button" class="h-8 w-8 rounded-lg inline-flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-white/60 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-700/50" @onclick="Close" aria-label="Close">
+        <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 6l12 12"></path>
+          <path d="M18 6l-12 12"></path>
+        </svg>
+      </button>
     </div>
     <div class="py-4">
       @ChildContent
@@ -14,6 +20,7 @@
         @Footer
       </div>
     }
+    </div>
   </div>
 </div>
 

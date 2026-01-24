@@ -38,6 +38,9 @@ header .btn.btn-muted{ margin-left: .25rem; }
 .card{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);backdrop-filter:saturate(180%) blur(10px);}
 .dark .card{background:var(--color-surface-dark);border-color:var(--color-border-dark);} 
 
+.crm-modal{width:100%;}
+.crm-modal-dialog{width:min(92vw,720px);max-width:92vw;}
+
 .btn{display:inline-flex;align-items:center;gap:.5rem;border-radius:12px;padding:.5rem 1rem;font-weight:600;letter-spacing:.01em;transition:transform .05s ease,filter .2s,background .2s,color .2s,border .2s;}
 .btn:active{transform:translateY(1px)}
 .btn-primary{color:#fff;background:var(--color-brand);box-shadow:0 6px 16px rgba(79,70,229,.25)}
@@ -51,15 +54,19 @@ header .btn.btn-muted{ margin-left: .25rem; }
 .input:focus,.select:focus{box-shadow:0 0 0 3px rgba(79,70,229,.15);border-color:rgba(79,70,229,.4)}
 .dark .input,.dark .select{background:rgba(30,41,59,.7);border-color:var(--color-border-dark);color:#e2e8f0}
 
+.activity-editor{grid-template-columns:repeat(auto-fit,minmax(160px,1fr));}
+.activity-editor .select,.activity-editor .input{min-width:0;}
+
 .chip{display:inline-flex;align-items:center;gap:.25rem;border-radius:9999px;padding:.2rem .6rem;font-size:11px;background:rgba(79,70,229,.12);color:#4338ca}
 .dark .chip{background:rgba(79,70,229,.2);color:#c7d2fe}
 
 .table-h{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#64748b}
 .dark .table-h{color:#94a3b8}
 
-.link{display:inline-flex;align-items:center;gap:.25rem;padding:.25rem .5rem;border-radius:.5rem;color:var(--color-brand);font-weight:600}
-.link:hover{background:rgba(99,102,241,.1)}
-.dark .link:hover{background:rgba(99,102,241,.2)}
+.link{display:inline-flex;align-items:center;gap:.25rem;padding:.3rem .6rem;border-radius:.6rem;color:var(--color-brand);font-weight:600;background:rgba(79,70,229,.12);border:1px solid rgba(79,70,229,.2)}
+.link:hover{background:rgba(79,70,229,.2)}
+.dark .link{color:#e0e7ff;background:rgba(99,102,241,.25);border-color:rgba(99,102,241,.35)}
+.dark .link:hover{background:rgba(99,102,241,.35)}
 
 .glass{background:rgba(255,255,255,.8)}
 .dark .glass{background:rgba(2,6,23,.6)}
