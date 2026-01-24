@@ -123,6 +123,10 @@ Manual EF commands:
 - Multi-tenancy: ITenantProvider (HttpTenantProvider) reads claim "tenant"; defaults to Guid.Empty when missing
 - Antiforgery: HTML form endpoints (/auth/login and /auth/logout) validate antiforgery tokens. The Blazor forms include <AntiforgeryToken /> inside the form body (not in <head>).
 
+## Performance notes
+- List/search handlers now use DB-level paging and filtering to avoid in-memory scans.
+- Added composite indexes for high-cardinality queries: (TenantId, CreatedAtUtc) on major tables, plus (TenantId, Name) for Company and (TenantId, Email) for Contact.
+
 ## API (v1) — endpoints and examples
 All /api routes are protected and use CORS policy "maui" and fixed-window rate limiting (60 req/min). Use Bearer <accessToken> for protected routes.
 
