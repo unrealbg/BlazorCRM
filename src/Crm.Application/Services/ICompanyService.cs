@@ -4,7 +4,16 @@ namespace Crm.Application.Services
 
     public interface ICompanyService
     {
-        Task<IEnumerable<Company>> GetAllAsync(string? search = null, CancellationToken ct = default);
+        Task<Crm.Application.Common.Models.PagedResult<Crm.Application.Companies.Queries.CompanyListItem>> SearchAsync(
+            string? search,
+            string? industry,
+            string sort,
+            bool asc,
+            int page,
+            int pageSize,
+            CancellationToken ct = default);
+
+        Task<string[]> GetDistinctIndustriesAsync(string? search = null, CancellationToken ct = default);
 
         Task<Company> GetByIdAsync(Guid id, CancellationToken ct = default);
 

@@ -4,7 +4,11 @@ namespace Crm.Application.Services
 
     public interface IContactService
     {
-        Task<IEnumerable<Contact>> GetAllAsync(string? search = null, CancellationToken ct = default);
+        Task<Crm.Application.Common.Models.PagedResult<Contact>> SearchAsync(
+            string? search = null,
+            int page = 1,
+            int pageSize = 50,
+            CancellationToken ct = default);
 
         Task<Contact> GetByIdAsync(Guid id, CancellationToken ct = default);
 

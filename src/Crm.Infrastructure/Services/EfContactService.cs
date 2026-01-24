@@ -15,7 +15,11 @@ namespace Crm.Infrastructure.Services
             _db = db;
         }
 
-        public async Task<IEnumerable<Contact>> GetAllAsync(string? search = null, CancellationToken ct = default)
+        public async Task<Crm.Application.Common.Models.PagedResult<Contact>> SearchAsync(
+            string? search = null,
+            int page = 1,
+            int pageSize = 50,
+            CancellationToken ct = default)
         {
             IQueryable<Contact> q = _db.Contacts.AsNoTracking();
             if (!string.IsNullOrWhiteSpace(search))
@@ -28,7 +32,11 @@ namespace Crm.Infrastructure.Services
                     (c.Phone != null && EF.Functions.Like(c.Phone, $"%{s}%"))
                 );
             }
-            return await q.OrderBy(c => c.LastName).ThenBy(c => c.FirstName).ToListAsync(ct);
+
+            var ordered = q.OrderBy(c => c.LastName).ThenBy(c => c.FirstName).ThenBy(c => c.Id);
+            var total = await ordered.CountAsync(ct);
+            var items = await ordered.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
+            return new Crm.Application.Common.Models.PagedResult<Contact>(items, total);
         }
 
         public async Task<Contact> GetByIdAsync(Guid id, CancellationToken ct = default)
@@ -82,8 +90,16 @@ namespace Crm.Infrastructure.Services
             while (true)
             {
                 var line = await reader.ReadLineAsync();
-                if (line is null) break;
-                if (string.IsNullOrWhiteSpace(line)) continue;
+                if (line is null)
+                {
+                    break;
+                }
+
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    continue;
+                }
+
                 var cols = line.Split(',');
                 var first = cols.ElementAtOrDefault(0)?.Trim() ?? string.Empty;
                 var last = cols.ElementAtOrDefault(1)?.Trim() ?? string.Empty;

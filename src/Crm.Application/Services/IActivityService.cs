@@ -4,7 +4,13 @@ namespace Crm.Application.Services
 
     public interface IActivityService
     {
-        Task<IEnumerable<Activity>> GetAllAsync(Guid? relatedId = null, CancellationToken ct = default);
+        Task<Crm.Application.Common.Models.PagedResult<Activity>> GetPageAsync(
+            Guid? relatedId = null,
+            Crm.Domain.Enums.ActivityType? type = null,
+            Crm.Domain.Enums.ActivityStatus? status = null,
+            int page = 1,
+            int pageSize = 50,
+            CancellationToken ct = default);
 
         Task<Activity> GetByIdAsync(Guid id, CancellationToken ct = default);
 

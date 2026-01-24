@@ -91,6 +91,8 @@ namespace Crm.Infrastructure.Persistence
                 b.Property(x => x.Name).IsRequired().HasMaxLength(200);
                 b.Property(x => x.Industry).HasMaxLength(100);
                 b.Property(x => x.Address).HasMaxLength(500);
+                b.HasIndex(x => new { x.TenantId, x.CreatedAtUtc });
+                b.HasIndex(x => new { x.TenantId, x.Name });
                 var prop = b.Property(x => x.Tags)
                     .HasConversion(
                         v => string.Join(',', v ?? new List<string>()),
@@ -115,6 +117,8 @@ namespace Crm.Infrastructure.Persistence
                 b.Property(x => x.LastName).IsRequired().HasMaxLength(100);
                 b.Property(x => x.Email).HasMaxLength(256);
                 b.Property(x => x.Phone).HasMaxLength(50);
+                b.HasIndex(x => new { x.TenantId, x.CreatedAtUtc });
+                b.HasIndex(x => new { x.TenantId, x.Email });
                 var prop = b.Property(x => x.Tags)
                     .HasConversion(
                         v => string.Join(',', v ?? new List<string>()),
@@ -150,6 +154,7 @@ namespace Crm.Infrastructure.Persistence
             {
                 b.Property(x => x.Title).IsRequired().HasMaxLength(200);
                 b.Property(x => x.Currency).IsRequired().HasMaxLength(10);
+                b.HasIndex(x => new { x.TenantId, x.CreatedAtUtc });
                 if (isNpgsql)
                 {
                     b.Property<NpgsqlTsVector>("SearchVector")
@@ -177,6 +182,7 @@ namespace Crm.Infrastructure.Persistence
                 b.Property(x => x.RelatedId);
                 b.Property(x => x.OwnerId);
                 b.HasIndex(x => new { x.TenantId, x.RelatedId });
+                b.HasIndex(x => new { x.TenantId, x.CreatedAtUtc });
                 b.HasQueryFilter(e => e.TenantId == _tenantProvider.TenantId);
             });
 
@@ -184,6 +190,7 @@ namespace Crm.Infrastructure.Persistence
             {
                 b.Property(x => x.Title).IsRequired().HasMaxLength(200);
                 b.HasIndex(x => new { x.TenantId, x.RelatedId });
+                b.HasIndex(x => new { x.TenantId, x.CreatedAtUtc });
                 b.HasQueryFilter(e => e.TenantId == _tenantProvider.TenantId);
             });
 
@@ -231,6 +238,14 @@ namespace Crm.Infrastructure.Persistence
                 if (entry.State == EntityState.Added && entry.Entity.TenantId == Guid.Empty)
                 {
                     entry.Entity.TenantId = tenantIdCurrent;
+                }
+            }
+
+            foreach (var entry in ChangeTracker.Entries<Crm.Domain.Common.IHasCreatedAt>())
+            {
+                if (entry.State == EntityState.Added && entry.Entity.CreatedAtUtc == default)
+                {
+                    entry.Entity.CreatedAtUtc = DateTime.UtcNow;
                 }
             }
 

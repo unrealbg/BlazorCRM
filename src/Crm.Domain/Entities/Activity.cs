@@ -3,7 +3,7 @@ namespace Crm.Domain.Entities
     using Crm.Domain.Common;
     using Crm.Domain.Enums;
 
-    public class Activity : BaseEntity, ITenantOwned
+    public class Activity : BaseEntity, ITenantOwned, IHasCreatedAt
     {
         public Guid TenantId { get; set; }
 
@@ -20,5 +20,7 @@ namespace Crm.Domain.Entities
         public string? Notes { get; set; }
 
         public Guid? OwnerId { get; set; }
+
+        public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     }
 }

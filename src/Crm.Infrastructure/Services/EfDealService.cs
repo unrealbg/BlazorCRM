@@ -11,7 +11,13 @@ namespace Crm.Infrastructure.Services
 
         public EfDealService(CrmDbContext db) => _db = db;
 
-        public async Task<IEnumerable<Deal>> GetAllAsync(Guid? pipelineId = null, Guid? stageId = null, Guid? ownerId = null, CancellationToken ct = default)
+        public async Task<Crm.Application.Common.Models.PagedResult<Deal>> GetPageAsync(
+            Guid? pipelineId = null,
+            Guid? stageId = null,
+            Guid? ownerId = null,
+            int page = 1,
+            int pageSize = 200,
+            CancellationToken ct = default)
         {
             IQueryable<Deal> q = _db.Deals.AsNoTracking();
             if (stageId is Guid sid)
@@ -30,7 +36,10 @@ namespace Crm.Infrastructure.Services
                 q = q.Where(d => stageIds.Contains(d.StageId));
             }
 
-            return await q.OrderBy(d => d.Title).ToListAsync(ct);
+            var ordered = q.OrderBy(d => d.Title).ThenBy(d => d.Id);
+            var total = await ordered.CountAsync(ct);
+            var items = await ordered.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
+            return new Crm.Application.Common.Models.PagedResult<Deal>(items, total);
         }
 
         public async Task<Deal> GetByIdAsync(Guid id, CancellationToken ct = default) =>

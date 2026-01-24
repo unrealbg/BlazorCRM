@@ -39,24 +39,26 @@ namespace Crm.Web.Components.Pages
             {
                 _users = UserManager.Users.ToList();
 
-                var list = await Service.GetAllAsync(_filter);
-
-                if (!string.IsNullOrEmpty(_ownerFilter))
+                Guid? ownerId = null;
+                if (!string.IsNullOrEmpty(_ownerFilter) && Guid.TryParse(_ownerFilter, out var parsedOwner))
                 {
-                    list = list.Where(t => t.OwnerId?.ToString() == _ownerFilter);
+                    ownerId = parsedOwner;
                 }
 
+                TaskPriority? priority = null;
                 if (!string.IsNullOrEmpty(_priority) && Enum.TryParse<TaskPriority>(_priority, out var pr))
                 {
-                    list = list.Where(t => t.Priority == pr);
+                    priority = pr;
                 }
 
+                TaskStatusDomain? status = null;
                 if (!string.IsNullOrEmpty(_status) && Enum.TryParse<TaskStatusDomain>(_status, out var st))
                 {
-                    list = list.Where(t => t.Status == st);
+                    status = st;
                 }
 
-                _items = list.OrderBy(t => t.DueAt ?? DateTime.MaxValue).ToList();
+                var res = await Service.SearchAsync(_filter, ownerId, priority, status, page: 1, pageSize: 200);
+                _items = res.Items.ToList();
             }
             finally
             {

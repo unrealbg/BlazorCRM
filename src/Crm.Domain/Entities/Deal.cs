@@ -3,7 +3,7 @@ namespace Crm.Domain.Entities
     using Crm.Domain.Common;
     using Crm.Domain.Enums;
 
-    public class Deal : BaseEntity, ITenantOwned
+    public class Deal : BaseEntity, ITenantOwned, IHasCreatedAt
     {
         public Guid TenantId { get; set; }
 
@@ -26,5 +26,7 @@ namespace Crm.Domain.Entities
         public DateTime? CloseDate { get; set; }
 
         public DealStatus Status { get; set; } = DealStatus.Open;
+
+        public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     }
 }

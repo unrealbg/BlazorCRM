@@ -4,7 +4,13 @@ namespace Crm.Application.Services
 
     public interface IDealService
     {
-        Task<IEnumerable<Deal>> GetAllAsync(Guid? pipelineId = null, Guid? stageId = null, Guid? ownerId = null, CancellationToken ct = default);
+        Task<Crm.Application.Common.Models.PagedResult<Deal>> GetPageAsync(
+            Guid? pipelineId = null,
+            Guid? stageId = null,
+            Guid? ownerId = null,
+            int page = 1,
+            int pageSize = 200,
+            CancellationToken ct = default);
 
         Task<Deal> GetByIdAsync(Guid id, CancellationToken ct = default);
 
