@@ -46,6 +46,9 @@ The solution demonstrates real-world practices: CQRS via MediatR, multi-tenancy,
 - Cors:AllowedOrigins — CORS origins for policy "maui"
 - Seed:AdminEmail / Seed:AdminPassword / Seed:AdminRoles — initial user and roles
 - Quartz:SchemaSqlPath — optional path to the Quartz SQL schema script
+- Attachments:UploadsRootPath — root directory for file storage (relative or absolute)
+- Attachments:MaxFileSizeBytes — max upload size in bytes (default 10MB)
+- Attachments:AllowedContentTypes — allowed MIME types list
 
 Example (appsettings.Development.json):
 ```json
@@ -59,6 +62,11 @@ Example (appsettings.Development.json):
     "Audience": "BlazorCrm"
   },
   "Cors": { "AllowedOrigins": ["https://localhost:5001", "http://localhost:5000"] },
+  "Attachments": {
+    "UploadsRootPath": "wwwroot/uploads",
+    "MaxFileSizeBytes": 10485760,
+    "AllowedContentTypes": ["image/png", "image/jpeg", "application/pdf"]
+  },
   "Seed": {
     "AdminEmail": "admin@local",
     "AdminPassword": "Admin123$",
@@ -72,6 +80,7 @@ Notes:
 - On startup: EF migrations are applied, IdentitySeeder runs (roles/admin), DemoDataSeeder runs in Development only.
 - Data Protection keys are stored in the database.
 - Demo data seeding can be toggled with Seed:DemoData (true/false). In Development it defaults to true via appsettings.Development.json.
+- Attachments are stored on disk under the uploads root and only relative paths are persisted in the database.
 
 ### Quartz schema (PostgreSQL)
 Quartz uses a persistent store. On first startup the app checks for Quartz tables and, if missing, looks for a SQL script and applies it automatically.
