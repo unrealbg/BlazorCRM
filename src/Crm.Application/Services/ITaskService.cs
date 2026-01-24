@@ -4,7 +4,14 @@ namespace Crm.Application.Services
 
     public interface ITaskService
     {
-        Task<IEnumerable<TaskItem>> GetAllAsync(string? filter = null, CancellationToken ct = default);
+        Task<Crm.Application.Common.Models.PagedResult<TaskItem>> SearchAsync(
+            string? filter = null,
+            Guid? ownerId = null,
+            Crm.Domain.Enums.TaskPriority? priority = null,
+            Crm.Domain.Enums.TaskStatus? status = null,
+            int page = 1,
+            int pageSize = 50,
+            CancellationToken ct = default);
 
         Task<TaskItem> GetByIdAsync(Guid id, CancellationToken ct = default);
 
