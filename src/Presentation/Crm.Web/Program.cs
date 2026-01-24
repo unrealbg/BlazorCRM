@@ -49,6 +49,7 @@ using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -322,6 +323,30 @@ builder.Services.AddScoped<Crm.Web.Services.ThemeState>();
 
 var app = builder.Build();
 
+var migrateOnly = args.Any(a => string.Equals(a, "--migrate", StringComparison.OrdinalIgnoreCase))
+    || (Environment.GetEnvironmentVariable("MIGRATE")?.Contains("--migrate", StringComparison.OrdinalIgnoreCase) ?? false)
+    || (Environment.GetEnvironmentVariable("MIGRATE_ARGS")?.Contains("--migrate", StringComparison.OrdinalIgnoreCase) ?? false)
+    || (Environment.GetEnvironmentVariable("ASPNETCORE_ARGS")?.Contains("--migrate", StringComparison.OrdinalIgnoreCase) ?? false);
+
+if (migrateOnly)
+{
+    try
+    {
+        using var migrateScope = app.Services.CreateScope();
+        var migrateDb = migrateScope.ServiceProvider.GetRequiredService<CrmDbContext>();
+        await migrateDb.Database.MigrateAsync();
+        app.Logger.LogInformation("Database migrations completed successfully.");
+        Environment.ExitCode = 0;
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogCritical(ex, "Database migrations failed.");
+        Environment.ExitCode = 1;
+    }
+
+    return;
+}
+
 app.UseExceptionHandler(appBuilder =>
 {
     appBuilder.Run(async ctx =>
@@ -449,6 +474,7 @@ app.Use(async (ctx, next) =>
     var db = scope.ServiceProvider.GetRequiredService<CrmDbContext>();
     var autoMigrateFlag = builder.Configuration.GetValue<bool?>("Database:AutoMigrate");
     var autoMigrate = app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing") || autoMigrateFlag == true;
+    var schemaReady = true;
 
     if (db.Database.IsInMemory())
     {
@@ -465,19 +491,21 @@ app.Use(async (ctx, next) =>
     {
         if (!await db.Database.CanConnectAsync())
         {
-            app.Logger.LogCritical("Database connection failed and auto-migrate is disabled. Set Database:AutoMigrate=true to enable automatic migrations.");
-            throw new InvalidOperationException("Database connection failed.");
+            schemaReady = false;
+            app.Logger.LogWarning("Database connection failed and auto-migrate is disabled. Readiness will report unhealthy.");
         }
-
-        var pending = await db.Database.GetPendingMigrationsAsync();
-        if (pending.Any())
+        else
         {
-            app.Logger.LogCritical("Database schema is out of date and auto-migrate is disabled. Pending migrations: {Migrations}", string.Join(", ", pending));
-            throw new InvalidOperationException("Database schema is out of date.");
+            var pending = await db.Database.GetPendingMigrationsAsync();
+            if (pending.Any())
+            {
+                schemaReady = false;
+                app.Logger.LogWarning("Database schema is out of date and auto-migrate is disabled. Pending migrations: {Migrations}", string.Join(", ", pending));
+            }
         }
     }
 
-    if (!app.Environment.IsEnvironment("Testing"))
+    if (!app.Environment.IsEnvironment("Testing") && schemaReady)
     {
         await EnsureDataProtectionSchemaAsync(configuredConnStr, app.Logger);
         await IdentitySeeder.SeedAsync(app.Services, builder.Configuration);
@@ -911,8 +939,8 @@ if (!app.Environment.IsEnvironment("Testing"))
     api.WithApiVersionSet(app.NewApiVersionSet().HasApiVersion(new ApiVersion(1, 0)).Build()).MapToApiVersion(new ApiVersion(1, 0));
 }
 
-api.MapGet("/health/live", () => Results.Ok()).AllowAnonymous();
-api.MapGet("/health/ready", () => Results.Ok()).AllowAnonymous();
+api.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false }).AllowAnonymous();
+api.MapHealthChecks("/health/ready").AllowAnonymous();
 
 // Unified search across Companies, Contacts, Deals (FTS on Postgres)
 api.MapGet("/search", async (
@@ -1118,6 +1146,7 @@ app.MapGet("/attachments/{id:guid}", async (Guid id, CrmDbContext db, IAttachmen
 }).RequireAuthorization().RequireRateLimiting("api");
 
 // Health endpoints (readiness)
+app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false }).AllowAnonymous();
 app.MapHealthChecks("/health/ready").AllowAnonymous();
 
 // SignalR hub
