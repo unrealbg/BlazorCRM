@@ -83,6 +83,7 @@ builder.Services.AddCascadingAuthenticationState();
 // Application layer
 builder.Services.AddApplication();
 builder.Services.AddScoped(typeof(IPipelineBehavior<,>), typeof(PermissionBehavior<,>));
+builder.Services.AddScoped<IPermissionEvaluator, PermissionEvaluator>();
 
 // Tenant provider
 builder.Services.AddHttpContextAccessor();
@@ -341,9 +342,12 @@ app.UseExceptionHandler(appBuilder =>
         }
         else if (ex is UnauthorizedAccessException)
         {
-            status = StatusCodes.Status403Forbidden;
-            title = "Forbidden";
-            detail = "You do not have permission to perform this action.";
+            var isAuthenticated = ctx.User?.Identity?.IsAuthenticated == true;
+            status = isAuthenticated ? StatusCodes.Status403Forbidden : StatusCodes.Status401Unauthorized;
+            title = status == StatusCodes.Status401Unauthorized ? "Unauthorized" : "Forbidden";
+            detail = status == StatusCodes.Status401Unauthorized
+                ? "Authentication is required to access this resource."
+                : "You do not have permission to perform this action.";
             logger.LogWarning(ex, "Unauthorized access.");
         }
         else
@@ -365,6 +369,55 @@ app.UseExceptionHandler(appBuilder =>
             await ctx.Response.WriteAsJsonAsync(problem);
         }
     });
+});
+
+app.UseStatusCodePages(async context =>
+{
+    var ctx = context.HttpContext;
+    if (ctx.Response.HasStarted)
+    {
+        return;
+    }
+
+    var isApi = ctx.Request.Path.StartsWithSegments("/api") ||
+                ctx.Request.Headers.Accept.Any(h => h.Contains("application/json", StringComparison.OrdinalIgnoreCase));
+
+    if (!isApi)
+    {
+        return;
+    }
+
+    var status = ctx.Response.StatusCode;
+    if (status < 400)
+    {
+        return;
+    }
+
+    ctx.Response.ContentType = "application/problem+json";
+    var title = status switch
+    {
+        StatusCodes.Status401Unauthorized => "Unauthorized",
+        StatusCodes.Status403Forbidden => "Forbidden",
+        StatusCodes.Status404NotFound => "Not Found",
+        _ => "Error"
+    };
+    var detail = status switch
+    {
+        StatusCodes.Status401Unauthorized => "Authentication is required to access this resource.",
+        StatusCodes.Status403Forbidden => "You do not have permission to perform this action.",
+        StatusCodes.Status404NotFound => "The requested resource was not found.",
+        _ => "An error occurred."
+    };
+
+    var problem = new ProblemDetails
+    {
+        Status = status,
+        Title = title,
+        Detail = detail,
+        Type = $"https://httpstatuses.com/{status}"
+    };
+
+    await ctx.Response.WriteAsJsonAsync(problem);
 });
 
 // Security headers
@@ -667,7 +720,8 @@ app.MapPost("/api/auth/login", async (
         return Results.BadRequest("Tenant could not be resolved.");
     }
 
-    var res = tokens.CreateToken(user.Id, user.UserName!, resolution.TenantId, resolution.TenantSlug ?? string.Empty);
+    var roles = await users.GetRolesAsync(user);
+    var res = tokens.CreateToken(user.Id, user.UserName!, resolution.TenantId, resolution.TenantSlug ?? string.Empty, roles);
     var hash = JwtTokenService.HashRefresh(res.RefreshToken);
     db.RefreshTokens.Add(new RefreshToken
     {
@@ -728,7 +782,8 @@ app.MapPost("/api/auth/refresh", async (RefreshRequest req, UserManager<Identity
 
     var tenant = await db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Id == existing.TenantId);
     var tenantSlug = tenant?.Slug ?? resolution.TenantSlug ?? string.Empty;
-    var newToken = tokens.CreateToken(user.Id, user.UserName!, existing.TenantId, tenantSlug);
+    var roles = await users.GetRolesAsync(user);
+    var newToken = tokens.CreateToken(user.Id, user.UserName!, existing.TenantId, tenantSlug, roles);
     var newHash = JwtTokenService.HashRefresh(newToken.RefreshToken);
     existing.ReplacedByHash = newHash;
     db.RefreshTokens.Add(new RefreshToken
