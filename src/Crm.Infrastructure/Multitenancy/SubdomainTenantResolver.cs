@@ -1,18 +1,22 @@
 namespace Crm.Infrastructure.Multitenancy
 {
     using Crm.Application.Common.Multitenancy;
-    using System.Linq;
+    using Crm.Domain.Entities;
     using Crm.Infrastructure.Persistence;
     using Microsoft.AspNetCore.Http;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.Hosting;
-    using Microsoft.Extensions.Options;
+    using System;
+    using System.Threading.Tasks;
 
     public sealed class SubdomainTenantResolver : ITenantResolver
     {
-        private readonly IHttpContextAccessor _ctx;
         private readonly DbContextOptions<CrmDbContext> _dbOptions;
-        private readonly TenantOptions _options;
+        private readonly string _baseDomain;
+        private readonly string _devHostSuffix;
+        private readonly string? _defaultTenantSlug;
+        private readonly string _defaultTenantName;
         private readonly IHostEnvironment _env;
 
         private sealed class NullTenantProvider : ITenantProvider
@@ -21,108 +25,103 @@ namespace Crm.Infrastructure.Multitenancy
         }
 
         public SubdomainTenantResolver(
-            IHttpContextAccessor ctx,
             DbContextOptions<CrmDbContext> dbOptions,
-            IOptions<TenantOptions> options,
+            IConfiguration configuration,
             IHostEnvironment env)
         {
-            _ctx = ctx;
             _dbOptions = dbOptions;
-            _options = options.Value;
+            _baseDomain = configuration["Tenancy:BaseDomain"] ?? string.Empty;
+            _devHostSuffix = configuration["Tenancy:DevHostSuffix"] ?? "localhost";
+            _defaultTenantSlug = configuration["Tenancy:DefaultTenantSlug"];
+            _defaultTenantName = configuration["Tenancy:DefaultTenantName"] ?? "Demo";
             _env = env;
         }
 
-        public TenantResolution Resolve()
+        public async Task<TenantContext> ResolveAsync(HttpContext httpContext)
         {
-            var http = _ctx.HttpContext;
-            if (http?.Items.TryGetValue(TenantContextKeys.Resolution, out var cached) == true && cached is TenantResolution cachedResolution)
+            if (httpContext.Items.TryGetValue(TenantContextKeys.Context, out var cached) && cached is TenantContext cachedContext)
             {
-                return cachedResolution;
+                return cachedContext;
             }
 
-            string? slug;
-
-            if (http is null)
-            {
-                slug = _options.DefaultTenantSlug;
-            }
-            else
-            {
-                var host = http.Request.Host.Host;
-                slug = ExtractSlug(host, _options.BaseDomains);
-
-                if (string.IsNullOrWhiteSpace(slug) && _env.IsDevelopment())
-                {
-                    slug = _options.DefaultTenantSlug;
-                }
-            }
+            var host = httpContext.Request.Host.Host;
+            var isDev = _env.IsDevelopment();
+            var slug = ExtractSlug(host);
 
             if (string.IsNullOrWhiteSpace(slug))
             {
-                return Cache(http, new TenantResolution(Guid.Empty, null, null, false, "Tenant slug could not be determined from host."));
+                if (string.Equals(host, _devHostSuffix, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!isDev || string.IsNullOrWhiteSpace(_defaultTenantSlug))
+                    {
+                        throw new TenantResolutionException("Tenant slug could not be determined from host.");
+                    }
+
+                    slug = _defaultTenantSlug;
+                }
+                else
+                {
+                    throw new TenantResolutionException("Tenant slug could not be determined from host.");
+                }
             }
 
             using var db = new CrmDbContext(_dbOptions, new NullTenantProvider());
-            var tenant = db.Tenants.AsNoTracking().FirstOrDefault(t => t.Slug == slug);
+            var tenant = await db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == slug);
+            if (tenant is null && isDev && !string.IsNullOrWhiteSpace(_defaultTenantSlug)
+                && !string.Equals(slug, _defaultTenantSlug, StringComparison.OrdinalIgnoreCase))
+            {
+                slug = _defaultTenantSlug;
+                tenant = await db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == slug);
+            }
+
             if (tenant is null)
             {
-                return Cache(http, new TenantResolution(Guid.Empty, null, slug, false, $"Tenant '{slug}' not found."));
+                if (_env.IsEnvironment("Testing") && !string.IsNullOrWhiteSpace(_defaultTenantSlug)
+                    && string.Equals(slug, _defaultTenantSlug, StringComparison.OrdinalIgnoreCase))
+                {
+                    tenant = new Tenant
+                    {
+                        Id = Guid.NewGuid(),
+                        Slug = slug,
+                        Name = _defaultTenantName
+                    };
+                    await db.Tenants.AddAsync(tenant);
+                    await db.SaveChangesAsync();
+                }
             }
 
-            return Cache(http, new TenantResolution(tenant.Id, tenant.Name, tenant.Slug, true, null));
-        }
-
-        private static TenantResolution Cache(HttpContext? http, TenantResolution resolution)
-        {
-            if (http is not null)
+            if (tenant is null)
             {
-                http.Items[TenantContextKeys.Resolution] = resolution;
+                throw new TenantResolutionException($"Tenant '{slug}' not found.");
             }
 
-            return resolution;
+            var context = new TenantContext(tenant.Id, tenant.Slug, tenant.Name);
+            httpContext.Items[TenantContextKeys.Context] = context;
+            return context;
         }
 
-        private static string? ExtractSlug(string? host, string[] baseDomains)
+        private string? ExtractSlug(string? host)
         {
             if (string.IsNullOrWhiteSpace(host))
             {
                 return null;
             }
 
-            if (host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
-                || host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase)
-                || host.Equals("::1", StringComparison.OrdinalIgnoreCase))
+            var devSuffix = "." + _devHostSuffix;
+            if (!string.IsNullOrWhiteSpace(_devHostSuffix) && host.EndsWith(devSuffix, StringComparison.OrdinalIgnoreCase))
             {
-                return null;
+                var sub = host[..^devSuffix.Length];
+                return sub.Split('.', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
             }
 
-            if (host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrWhiteSpace(_baseDomain))
             {
-                var sub = host[..^".localhost".Length];
-                return sub.Split('.', StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
-            }
-
-            if (baseDomains is not null && baseDomains.Length > 0)
-            {
-                foreach (var domain in baseDomains.Where(d => !string.IsNullOrWhiteSpace(d)))
+                var suffix = "." + _baseDomain;
+                if (host.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
                 {
-                    if (host.Equals(domain, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return null;
-                    }
-
-                    var suffix = "." + domain;
-                    if (host.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
-                    {
-                        var sub = host[..^suffix.Length];
-                        return sub.Split('.', StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
-                    }
+                    var sub = host[..^suffix.Length];
+                    return sub.Split('.', StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
                 }
-            }
-
-            if (host.Contains('.'))
-            {
-                return host.Split('.', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
             }
 
             return null;

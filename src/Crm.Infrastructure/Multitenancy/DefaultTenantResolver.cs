@@ -2,6 +2,8 @@ namespace Crm.Infrastructure.Multitenancy
 {
     using Crm.Application.Common.Multitenancy;
     using Microsoft.AspNetCore.Http;
+    using System;
+    using System.Threading.Tasks;
 
     /// <summary>
     /// Resolves the current tenant from the authenticated principal, with a deterministic default fallback
@@ -9,21 +11,17 @@ namespace Crm.Infrastructure.Multitenancy
     /// </summary>
     public sealed class DefaultTenantResolver : ITenantResolver
     {
-        private readonly IHttpContextAccessor _ctx;
-        public DefaultTenantResolver(IHttpContextAccessor ctx) => _ctx = ctx;
-
-        public TenantResolution Resolve()
+        public Task<TenantContext> ResolveAsync(HttpContext httpContext)
         {
-            var http = _ctx.HttpContext;
-            var claim = http?.User?.FindFirst("tenant")?.Value;
+            var claim = httpContext.User?.FindFirst("tenant")?.Value;
             if (Guid.TryParse(claim, out var tenantId))
             {
-                var name = http?.User?.FindFirst("tenant_name")?.Value;
-                var slug = http?.User?.FindFirst("tenant_slug")?.Value;
-                return new TenantResolution(tenantId, name, slug, true, null);
+                var name = httpContext.User?.FindFirst("tenant_name")?.Value ?? string.Empty;
+                var slug = httpContext.User?.FindFirst("tenant_slug")?.Value ?? string.Empty;
+                return Task.FromResult(new TenantContext(tenantId, slug, name));
             }
 
-            return new TenantResolution(Guid.Empty, null, null, false, "Tenant could not be resolved from claims.");
+            throw new TenantResolutionException("Tenant could not be resolved from claims.");
         }
     }
 }
