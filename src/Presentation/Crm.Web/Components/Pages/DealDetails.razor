@@ -5,70 +5,167 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using Crm.Application.Security
 
-<h1 class="text-2xl font-semibold mb-4">Deal details</h1>
+<div class="crm-detail-mobile">
+  <a class="link crm-back-link" href="javascript:history.back()">Back</a>
+  <h1 class="text-2xl font-semibold mb-3">Deal details</h1>
 
-<div class="grid lg:grid-cols-3 gap-4">
-  <div class="card p-4 lg:col-span-2">
-    @if (_loading)
-    {
-      <div>Loading...</div>
-    }
-    else if (_deal is null)
-    {
-      <div class="text-slate-500">Not found</div>
-    }
-    else
-    {
+  @if (_loading)
+  {
+    <div>Loading...</div>
+  }
+  else if (_deal is null)
+  {
+    <div class="text-slate-500">Not found</div>
+  }
+  else
+  {
+    <div class="ui-card p-4 space-y-2">
+      <div class="text-xl font-semibold">@_deal.Title</div>
+      <div class="flex items-center gap-2">
+        <UiBadge>@_deal.Status</UiBadge>
+        <UiBadge>@(_stageName ?? "Stage")</UiBadge>
+      </div>
+      <div class="text-slate-500">@_deal.Amount.ToString("C0") @_deal.Currency</div>
+    </div>
+
+    <div class="crm-action-row">
+      @if (!string.IsNullOrWhiteSpace(_contact?.Phone))
+      {
+        <a class="crm-action-btn" href="tel:@_contact.Phone">Call</a>
+      }
+      @if (!string.IsNullOrWhiteSpace(_contact?.Email))
+      {
+        <a class="crm-action-btn" href="mailto:@_contact.Email">Email</a>
+      }
+      @if (!string.IsNullOrWhiteSpace(_company?.Address))
+      {
+        <a class="crm-action-btn" href="https://maps.google.com/?q=@System.Uri.EscapeDataString(_company.Address)">Maps</a>
+      }
+    </div>
+
+    <details class="crm-accordion" open>
+      <summary>Details</summary>
+      <div class="space-y-2 text-sm text-slate-600">
+        <div>Probability: @_deal.Probability%</div>
+        @if (_deal.CompanyId is Guid cid)
+        {
+          <div><a class="link" href="/companies/@cid">@(_company?.Name ?? $"Company {cid}")</a></div>
+        }
+        @if (_deal.ContactId is Guid coid)
+        {
+          <div><a class="link" href="/contacts/@coid">@(_contact is null ? $"Contact {coid}" : $"{_contact.FirstName} {_contact.LastName}")</a></div>
+        }
+      </div>
+    </details>
+
+    <details class="crm-accordion">
+      <summary>Activities</summary>
+      <ActivitiesList RelatedTo="RelatedToType.Deal" RelatedId="Id" />
+    </details>
+
+    <details class="crm-accordion">
+      <summary>Tasks</summary>
+      <RelatedTasks RelatedTo="RelatedToType.Deal" RelatedId="Id" />
+    </details>
+
+    <details class="crm-accordion">
+      <summary>Attachments</summary>
       <div class="space-y-3">
-        <div class="flex items-center justify-between">
-          <div class="text-xl font-semibold">@_deal.Title</div>
-          <AuthorizeView Policy="@Permissions.Deals_Write">
-            <Authorized Context="auth">
-              <button class="btn btn-muted" @onclick="() => _editModal.Show()">Edit</button>
-            </Authorized>
-          </AuthorizeView>
-        </div>
-        <div class="text-slate-500">Amount: @_deal.Amount.ToString("C0") @_deal.Currency</div>
-        <div class="text-slate-500">Probability: @_deal.Probability%</div>
-        <div class="text-slate-500">Stage: @(_stageName ?? _deal.StageId.ToString())</div>
-        @if (_deal.CompanyId is Guid cid) 
-        { 
-            <div><a class="link" href="/companies/@cid">Company @cid</a></div> 
-        }
-
-        @if (_deal.ContactId is Guid coid) 
-        { 
-            <div><a class="link" href="/contacts/@coid">Contact @coid</a></div> 
-        }
-
-        <div class="mt-4">
-          <div class="font-semibold mb-2">Attachments</div>
-          <AuthorizeView Policy="@Permissions.Attachments_Write">
-            <Authorized Context="auth2">
-              <InputFile OnChange="OnUpload" />
-            </Authorized>
-          </AuthorizeView>
-          <ul class="mt-2 space-y-1">
-            @foreach (var a in _attachments)
-            {
-              <li class="flex items-center justify-between text-sm">
-                <a class="link" href="/attachments/@a.Id">@a.FileName</a>
+        <AuthorizeView Policy="@Permissions.Attachments_Write">
+          <Authorized Context="auth2">
+            <label class="ui-btn ui-btn-primary cursor-pointer">Upload<InputFile class="hidden" OnChange="OnUpload" /></label>
+          </Authorized>
+        </AuthorizeView>
+        <ul class="space-y-2">
+          @foreach (var a in _attachments)
+          {
+            <li class="crm-attachment-row">
+              <div class="min-w-0">
+                <div class="font-medium truncate">@a.FileName</div>
+                <div class="text-xs text-slate-500">@FormatSize(a.Size)</div>
+              </div>
+              <div class="flex items-center gap-2">
+                <a class="link" href="/attachments/@a.Id">Download</a>
                 <AuthorizeView Policy="@Permissions.Attachments_Write">
                   <Authorized Context="auth3">
                     <button class="link text-rose-500" @onclick="() => AskDeleteAttachment(a.Id)">Delete</button>
                   </Authorized>
                 </AuthorizeView>
-              </li>
-            }
-          </ul>
-        </div>
+              </div>
+            </li>
+          }
+        </ul>
       </div>
-    }
-  </div>
+    </details>
+  }
+</div>
 
-  <div class="card p-4">
-    <div class="font-semibold mb-2">Activities</div>
-    <ActivitiesList RelatedTo="RelatedToType.Deal" RelatedId="Id" />
+<div class="crm-detail-desktop">
+  <h1 class="text-2xl font-semibold mb-4">Deal details</h1>
+
+  <div class="grid lg:grid-cols-3 gap-4">
+    <div class="card p-4 lg:col-span-2">
+      @if (_loading)
+      {
+        <div>Loading...</div>
+      }
+      else if (_deal is null)
+      {
+        <div class="text-slate-500">Not found</div>
+      }
+      else
+      {
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="text-xl font-semibold">@_deal.Title</div>
+            <AuthorizeView Policy="@Permissions.Deals_Write">
+              <Authorized Context="auth">
+                <button class="btn btn-muted" @onclick="() => _editModal.Show()">Edit</button>
+              </Authorized>
+            </AuthorizeView>
+          </div>
+          <div class="text-slate-500">Amount: @_deal.Amount.ToString("C0") @_deal.Currency</div>
+          <div class="text-slate-500">Probability: @_deal.Probability%</div>
+          <div class="text-slate-500">Stage: @(_stageName ?? _deal.StageId.ToString())</div>
+          @if (_deal.CompanyId is Guid cid) 
+          { 
+              <div><a class="link" href="/companies/@cid">Company @cid</a></div> 
+          }
+
+          @if (_deal.ContactId is Guid coid) 
+          { 
+              <div><a class="link" href="/contacts/@coid">Contact @coid</a></div> 
+          }
+
+          <div class="mt-4">
+            <div class="font-semibold mb-2">Attachments</div>
+            <AuthorizeView Policy="@Permissions.Attachments_Write">
+              <Authorized Context="auth2">
+                <InputFile OnChange="OnUpload" />
+              </Authorized>
+            </AuthorizeView>
+            <ul class="mt-2 space-y-1">
+              @foreach (var a in _attachments)
+              {
+                <li class="flex items-center justify-between text-sm">
+                  <a class="link" href="/attachments/@a.Id">@a.FileName</a>
+                  <AuthorizeView Policy="@Permissions.Attachments_Write">
+                    <Authorized Context="auth3">
+                      <button class="link text-rose-500" @onclick="() => AskDeleteAttachment(a.Id)">Delete</button>
+                    </Authorized>
+                  </AuthorizeView>
+                </li>
+              }
+            </ul>
+          </div>
+        </div>
+      }
+    </div>
+
+    <div class="card p-4">
+      <div class="font-semibold mb-2">Activities</div>
+      <ActivitiesList RelatedTo="RelatedToType.Deal" RelatedId="Id" />
+    </div>
   </div>
 </div>
 

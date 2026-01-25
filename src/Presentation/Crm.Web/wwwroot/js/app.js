@@ -336,7 +336,6 @@
     return close;
   }
 
-
   function wireSearchOverlay() {
     searchOverlayEl = qs("#searchOverlay");
     searchOverlayInput = qs("#searchOverlayInput");

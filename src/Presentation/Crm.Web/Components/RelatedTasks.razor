@@ -1,0 +1,71 @@
+@using Crm.Application.Services
+@using Crm.Contracts.Paging
+@using Crm.Domain.Entities
+@using Crm.Domain.Enums
+
+<div class="space-y-3">
+  @if (_loading)
+  {
+    <div>Loading...</div>
+  }
+  else if (_items.Count == 0)
+  {
+    <div class="text-slate-500">No tasks</div>
+  }
+  else
+  {
+    <ul class="space-y-2">
+      @foreach (var t in _items)
+      {
+        <li class="flex items-center justify-between gap-2 text-sm">
+          <div class="min-w-0">
+            <div class="font-medium truncate">@t.Title</div>
+            <div class="text-xs text-slate-500">
+              @if (t.DueAt is not null)
+              {
+                <span>@t.DueAt.Value.ToLocalTime().ToString("g")</span>
+              }
+              <span class="ml-2 chip">@t.Status</span>
+            </div>
+          </div>
+          <a class="link" href="/tasks/@t.Id">Open</a>
+        </li>
+      }
+    </ul>
+  }
+</div>
+
+@code {
+  [Parameter]
+  public RelatedToType RelatedTo { get; set; }
+
+  [Parameter]
+  public Guid RelatedId { get; set; }
+
+  [Inject]
+  ITaskService Service { get; set; } = default!;
+
+  bool _loading = true;
+  List<TaskItem> _items = new();
+
+  protected override async Task OnParametersSetAsync()
+  {
+    _loading = true;
+    try
+    {
+      var res = await Service.SearchAsync(new PagedRequest
+      {
+        Page = 1,
+        PageSize = 10,
+        SortBy = nameof(TaskItem.DueAt),
+        SortDir = "asc"
+      }, null, null, null, RelatedTo, RelatedId);
+
+      _items = res.Items.ToList();
+    }
+    finally
+    {
+      _loading = false;
+    }
+  }
+}

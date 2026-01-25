@@ -10,6 +10,8 @@ namespace Crm.Application.Services
             Guid? ownerId = null,
             Crm.Domain.Enums.TaskPriority? priority = null,
             Crm.Domain.Enums.TaskStatus? status = null,
+            Crm.Domain.Enums.RelatedToType? relatedTo = null,
+            Guid? relatedId = null,
             CancellationToken ct = default);
 
         Task<TaskItem> GetByIdAsync(Guid id, CancellationToken ct = default);

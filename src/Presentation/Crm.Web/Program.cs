@@ -425,7 +425,8 @@ app.UseStatusCodePages(async context =>
     }
 
     var isApi = ctx.Request.Path.StartsWithSegments("/api") ||
-                ctx.Request.Headers.Accept.Any(h => h.Contains("application/json", StringComparison.OrdinalIgnoreCase));
+                (ctx.Request.Headers.TryGetValue("Accept", out var accept) &&
+                 accept.Any(h => h is not null && h.Contains("application/json", StringComparison.OrdinalIgnoreCase)));
 
     if (!isApi)
     {

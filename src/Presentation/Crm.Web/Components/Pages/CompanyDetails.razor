@@ -4,42 +4,140 @@
 @using Crm.Domain.Enums
 @using Crm.Application.Security
 
-<h1 class="text-2xl font-semibold mb-4">Company details</h1>
+<div class="crm-detail-mobile">
+  <a class="link crm-back-link" href="javascript:history.back()">Back</a>
+  <h1 class="text-2xl font-semibold mb-3">Company details</h1>
 
-<div class="grid lg:grid-cols-3 gap-4">
-  <div class="card p-4 lg:col-span-2">
-    @if (_loading)
-    {
-      <div>Loading...</div>
-    }
-    else if (_company is null)
-    {
-      <div class="text-slate-500">Not found</div>
-    }
-    else
-    {
-      <div class="space-y-2">
-        <div class="flex items-center justify-between">
-          <div class="text-xl font-semibold">@_company.Name</div>
-          <AuthorizeView Policy="@Permissions.Companies_Write">
-            <Authorized Context="auth">
-              <button class="btn btn-muted" @onclick="() => _editModal.Show()">Edit</button>
-            </Authorized>
-          </AuthorizeView>
-        </div>
-        @if (!string.IsNullOrWhiteSpace(_company.Industry)) { <div class="text-slate-500">Industry: @_company.Industry</div> }
-        @if (!string.IsNullOrWhiteSpace(_company.Address)) { <div class="text-slate-500">Address: @_company.Address</div> }
+  @if (_loading)
+  {
+    <div>Loading...</div>
+  }
+  else if (_company is null)
+  {
+    <div class="text-slate-500">Not found</div>
+  }
+  else
+  {
+    <div class="ui-card p-4 space-y-2">
+      <div class="text-xl font-semibold">@_company.Name</div>
+      <UiBadge>Company</UiBadge>
+      @if (!string.IsNullOrWhiteSpace(_company.Industry))
+      {
+        <div class="text-slate-500">@_company.Industry</div>
+      }
+    </div>
+
+    <div class="crm-action-row">
+      @if (!string.IsNullOrWhiteSpace(_company.Address))
+      {
+        <a class="crm-action-btn" href="https://maps.google.com/?q=@System.Uri.EscapeDataString(_company.Address)">Maps</a>
+      }
+    </div>
+
+    <details class="crm-accordion" open>
+      <summary>Details</summary>
+      <div class="space-y-2 text-sm text-slate-600">
+        @if (!string.IsNullOrWhiteSpace(_company.Industry))
+        {
+          <div>Industry: @_company.Industry</div>
+        }
+        @if (!string.IsNullOrWhiteSpace(_company.Address))
+        {
+          <div>Address: @_company.Address</div>
+        }
         @if (_company.Tags?.Count > 0)
         {
-          <div class="text-slate-500">Tags: @string.Join(", ", _company.Tags)</div>
+          <div>Tags: @string.Join(", ", _company.Tags)</div>
         }
       </div>
-    }
-  </div>
+    </details>
 
-  <div class="card p-4">
-    <div class="font-semibold mb-2">Activities</div>
-    <ActivitiesList RelatedTo="RelatedToType.Company" RelatedId="Id" />
+    <details class="crm-accordion">
+      <summary>Activities</summary>
+      <ActivitiesList RelatedTo="RelatedToType.Company" RelatedId="Id" />
+    </details>
+
+    <details class="crm-accordion">
+      <summary>Tasks</summary>
+      <RelatedTasks RelatedTo="RelatedToType.Company" RelatedId="Id" />
+    </details>
+
+    <details class="crm-accordion">
+      <summary>Attachments</summary>
+      <div class="space-y-3">
+        <AuthorizeView Policy="@Permissions.Attachments_Write">
+          <Authorized Context="auth2">
+            <label class="ui-btn ui-btn-primary cursor-pointer">Upload<InputFile class="hidden" OnChange="OnUpload" /></label>
+          </Authorized>
+        </AuthorizeView>
+        <ul class="space-y-2">
+          @foreach (var a in _attachments)
+          {
+            <li class="crm-attachment-row">
+              <div class="min-w-0">
+                <div class="font-medium truncate">@a.FileName</div>
+                <div class="text-xs text-slate-500">@FormatSize(a.Size)</div>
+              </div>
+              <div class="flex items-center gap-2">
+                <a class="link" href="/attachments/@a.Id">Download</a>
+                <AuthorizeView Policy="@Permissions.Attachments_Write">
+                  <Authorized Context="auth3">
+                    <button class="link text-rose-500" @onclick="() => AskDeleteAttachment(a.Id)">Delete</button>
+                  </Authorized>
+                </AuthorizeView>
+              </div>
+            </li>
+          }
+        </ul>
+      </div>
+    </details>
+  }
+</div>
+
+<div class="crm-detail-desktop">
+  <h1 class="text-2xl font-semibold mb-4">Company details</h1>
+
+  <div class="grid lg:grid-cols-3 gap-4">
+    <div class="card p-4 lg:col-span-2">
+      @if (_loading)
+      {
+        <div>Loading...</div>
+      }
+      else if (_company is null)
+      {
+        <div class="text-slate-500">Not found</div>
+      }
+      else
+      {
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <div class="text-xl font-semibold">@_company.Name</div>
+            <AuthorizeView Policy="@Permissions.Companies_Write">
+              <Authorized Context="auth">
+                <button class="btn btn-muted" @onclick="() => _editModal.Show()">Edit</button>
+              </Authorized>
+            </AuthorizeView>
+          </div>
+          @if (!string.IsNullOrWhiteSpace(_company.Industry)) 
+          { 
+              <div class="text-slate-500">Industry: @_company.Industry</div> 
+          }
+          @if (!string.IsNullOrWhiteSpace(_company.Address)) 
+          { 
+              <div class="text-slate-500">Address: @_company.Address</div> 
+          }
+          @if (_company.Tags?.Count > 0)
+          {
+            <div class="text-slate-500">Tags: @string.Join(", ", _company.Tags)</div>
+          }
+        </div>
+      }
+    </div>
+
+    <div class="card p-4">
+      <div class="font-semibold mb-2">Activities</div>
+      <ActivitiesList RelatedTo="RelatedToType.Company" RelatedId="Id" />
+    </div>
   </div>
 </div>
 
@@ -66,5 +164,7 @@
     </Modal>
   </Authorized>
 </AuthorizeView>
+
+<ConfirmModal @ref="_confirm" Title="Delete Attachment" Message="Are you sure you want to delete this attachment?" OnConfirmed="ConfirmDeleteAttachmentAsync" />
 
 

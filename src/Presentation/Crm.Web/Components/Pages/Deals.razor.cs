@@ -9,6 +9,7 @@ namespace Crm.Web.Components.Pages
     using Microsoft.AspNetCore.Components;
     using Microsoft.AspNetCore.Components.Web;
     using Microsoft.AspNetCore.Identity;
+    using Microsoft.EntityFrameworkCore;
 
     using System;
     using System.Collections.Generic;
@@ -35,6 +36,9 @@ namespace Crm.Web.Components.Pages
         [Inject]
         UserManager<IdentityUser> UserManager { get; set; } = default!;
 
+        [Inject]
+        IServiceScopeFactory ScopeFactory { get; set; } = default!;
+
         bool _loading = true;
         List<Pipeline> _pipelines = new();
         List<Stage> _stages = new();
@@ -55,6 +59,8 @@ namespace Crm.Web.Components.Pages
         HashSet<Guid> _expandedDealIds = new();
         Deal? _moveDeal;
         bool _showMoveSheet;
+        readonly CancellationTokenSource _disposeCts = new();
+        bool _disposed;
 
         Guid SelectedPipelineId
         {
@@ -80,7 +86,8 @@ namespace Crm.Web.Components.Pages
 
         private async Task LoadPipelines()
         {
-            _pipelines = (await PipelineService.GetPipelinesAsync()).ToList();
+            var ct = _disposeCts.Token;
+            _pipelines = (await PipelineService.GetPipelinesAsync(ct: ct)).ToList();
             _selectedPipelineId = _pipelines.FirstOrDefault()?.Id ?? Guid.Empty;
         }
 
@@ -89,9 +96,10 @@ namespace Crm.Web.Components.Pages
             _loading = true;
             try
             {
+                                var ct = _disposeCts.Token;
                 _stages = _selectedPipelineId == Guid.Empty
                   ? new()
-                  : (await PipelineService.GetStagesAsync(_selectedPipelineId)).OrderBy(s => s.Order).ToList();
+                                    : (await PipelineService.GetStagesAsync(_selectedPipelineId, ct)).OrderBy(s => s.Order).ToList();
 
                 _stageNameMap = _stages.ToDictionary(s => s.Id, s => s.Name);
 
@@ -104,11 +112,14 @@ namespace Crm.Web.Components.Pages
                         PageSize = 200,
                         SortBy = nameof(Deal.Amount),
                         SortDir = "desc"
-                    }, pipelineId: _selectedPipelineId)).Items;
+                                        }, pipelineId: _selectedPipelineId, ct: ct)).Items;
 
-                _users = UserManager.Users.ToList();
-                await LoadCompanyNamesAsync(deals);
-                await LoadContactNamesAsync(deals);
+                                if (ct.IsCancellationRequested) return;
+
+                                _users = await LoadUsersAsync(ct);
+                                if (ct.IsCancellationRequested) return;
+                                await LoadCompanyNamesAsync(deals, ct);
+                                await LoadContactNamesAsync(deals, ct);
 
                 foreach (var g in deals.GroupBy(d => d.StageId))
                 {
@@ -129,7 +140,7 @@ namespace Crm.Web.Components.Pages
         async Task OpenDrawer(Deal deal)
         {
             _drawerDeal = deal;
-            _editDeal = await DealService.GetByIdAsync(deal.Id);
+            _editDeal = await DealService.GetByIdAsync(deal.Id, _disposeCts.Token);
             _drawerOpen = true;
             await LoadTimelineAsync(deal.Id);
         }
@@ -139,13 +150,15 @@ namespace Crm.Web.Components.Pages
             _loadingTimeline = true;
             try
             {
+                                var ct = _disposeCts.Token;
                                 var activities = await ActivityService.GetPageAsync(new PagedRequest
                                 {
                                     Page = 1,
                                     PageSize = 50,
                                     SortBy = nameof(Activity.DueAt),
                                     SortDir = "desc"
-                                }, dealId);
+                                }, dealId, ct: ct);
+                                if (ct.IsCancellationRequested) return;
                                 _timeline = activities.Items
                                     .Select(a => new ActivityTimelineItem(
                     a.Type switch
@@ -174,7 +187,7 @@ namespace Crm.Web.Components.Pages
                 return;
             }
 
-            await DealService.UpsertAsync(_editDeal);
+            await DealService.UpsertAsync(_editDeal, _disposeCts.Token);
             _drawerOpen = false;
             await Reload();
         }
@@ -216,7 +229,7 @@ namespace Crm.Web.Components.Pages
             _hoveredStageId = null;
             _ghostDealId = null;
 
-            var ok = await DealService.MoveToStageAsync(dealId, targetStageId);
+            var ok = await DealService.MoveToStageAsync(dealId, targetStageId, _disposeCts.Token);
             if (!ok)
             {
                 await Reload();
@@ -263,14 +276,14 @@ namespace Crm.Web.Components.Pages
 
             CloseMoveSheet();
 
-            var ok = await DealService.MoveToStageAsync(deal.Id, targetStageId);
+            var ok = await DealService.MoveToStageAsync(deal.Id, targetStageId, _disposeCts.Token);
             if (!ok)
             {
                 await Reload();
             }
         }
 
-        async Task LoadCompanyNamesAsync(IEnumerable<Deal> deals)
+        async Task LoadCompanyNamesAsync(IEnumerable<Deal> deals, CancellationToken ct)
         {
             var ids = deals
                 .Where(d => d.CompanyId.HasValue)
@@ -283,7 +296,7 @@ namespace Crm.Web.Components.Pages
             {
                 try
                 {
-                    var company = await CompanyService.GetByIdAsync(id);
+                    var company = await CompanyService.GetByIdAsync(id, ct);
                     _companyNames[id] = company.Name;
                 }
                 catch
@@ -293,7 +306,7 @@ namespace Crm.Web.Components.Pages
             }
         }
 
-        async Task LoadContactNamesAsync(IEnumerable<Deal> deals)
+        async Task LoadContactNamesAsync(IEnumerable<Deal> deals, CancellationToken ct)
         {
             var ids = deals
                 .Where(d => d.ContactId.HasValue)
@@ -306,7 +319,7 @@ namespace Crm.Web.Components.Pages
             {
                 try
                 {
-                    var contact = await ContactService.GetByIdAsync(id);
+                    var contact = await ContactService.GetByIdAsync(id, ct);
                     _contactNames[id] = ContactDisplayName(contact);
                 }
                 catch
@@ -373,5 +386,24 @@ namespace Crm.Web.Components.Pages
           => string.IsNullOrWhiteSpace(u.Email) ? (u.UserName ?? u.Id) : u.Email!;
 
         static string ContactDisplayName(Contact c) => $"{c.FirstName} {c.LastName}";
+
+                async Task<List<IdentityUser>> LoadUsersAsync(CancellationToken ct)
+                {
+                        using var scope = ScopeFactory.CreateScope();
+                        var manager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
+                    return await manager.Users.ToListAsync(ct);
+                }
+
+                public void Dispose()
+                {
+                    if (_disposed)
+                    {
+                        return;
+                    }
+
+                    _disposed = true;
+                    _disposeCts.Cancel();
+                    _disposeCts.Dispose();
+                }
     }
 }

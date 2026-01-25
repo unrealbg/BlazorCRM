@@ -27,10 +27,18 @@ namespace Crm.Web.Components.Pages
         [Inject] 
         IPipelineService Pipelines { get; set; } = default!;
 
+        [Inject]
+        ICompanyService Companies { get; set; } = default!;
+
+        [Inject]
+        IContactService Contacts { get; set; } = default!;
+
         Deal? _deal;
         bool _loading = true;
         List<Attachment> _attachments = new();
         string? _stageName;
+        Company? _company;
+        Contact? _contact;
         Modal _editModal = default!;
         ConfirmModal _confirm = default!;
         Guid _pendingAttachmentId;
@@ -44,6 +52,14 @@ namespace Crm.Web.Components.Pages
                 _attachments = (await Attachments.GetForAsync(RelatedToType.Deal, Id)).ToList();
                 var map = await Pipelines.GetStageNameMapAsync();
                 _stageName = map.TryGetValue(_deal.StageId, out var name) ? name : null;
+                if (_deal.CompanyId is Guid cid)
+                {
+                    _company = await Companies.GetByIdAsync(cid);
+                }
+                if (_deal.ContactId is Guid coid)
+                {
+                    _contact = await Contacts.GetByIdAsync(coid);
+                }
             }
             catch
             {
@@ -95,6 +111,26 @@ namespace Crm.Web.Components.Pages
 
             await Deals.UpsertAsync(_deal);
             _editModal.Hide();
+        }
+
+        static string FormatSize(long size)
+        {
+            if (size < 1024)
+            {
+                return $"{size} B";
+            }
+
+            if (size < 1024 * 1024)
+            {
+                return $"{size / 1024d:0.#} KB";
+            }
+
+            if (size < 1024 * 1024 * 1024)
+            {
+                return $"{size / (1024d * 1024d):0.#} MB";
+            }
+
+            return $"{size / (1024d * 1024d * 1024d):0.#} GB";
         }
     }
 }

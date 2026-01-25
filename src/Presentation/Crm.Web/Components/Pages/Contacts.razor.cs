@@ -32,6 +32,8 @@ namespace Crm.Web.Components.Pages
         int _total = 0;
         int _pages = 1;
         bool _loading;
+        readonly CancellationTokenSource _disposeCts = new();
+        bool _disposed;
 
         protected override async Task OnInitializedAsync()
         {
@@ -50,6 +52,7 @@ namespace Crm.Web.Components.Pages
             _loading = true;
             try
             {
+                var ct = _disposeCts.Token;
                 var res = await ContactService.SearchAsync(new PagedRequest
                 {
                     Search = _search,
@@ -57,7 +60,11 @@ namespace Crm.Web.Components.Pages
                     PageSize = _pageSize,
                     SortBy = _sort,
                     SortDir = _asc ? "asc" : "desc"
-                });
+                }, ct);
+                if (ct.IsCancellationRequested)
+                {
+                    return;
+                }
 
                 _items = res.Items.ToList();
                 if (resetMobile)
@@ -68,7 +75,7 @@ namespace Crm.Web.Components.Pages
                 _total = res.TotalCount;
                 _pages = Math.Max(1, (int)Math.Ceiling(_total / (double)_pageSize));
 
-                await LoadCompanyNamesAsync(res.Items);
+                await LoadCompanyNamesAsync(res.Items, ct);
             }
             finally
             {
@@ -86,6 +93,7 @@ namespace Crm.Web.Components.Pages
             _loading = true;
             try
             {
+                var ct = _disposeCts.Token;
                 _mobilePage++;
                 var res = await ContactService.SearchAsync(new PagedRequest
                 {
@@ -94,13 +102,17 @@ namespace Crm.Web.Components.Pages
                     PageSize = _pageSize,
                     SortBy = _sort,
                     SortDir = _asc ? "asc" : "desc"
-                });
+                }, ct);
+                if (ct.IsCancellationRequested)
+                {
+                    return;
+                }
 
                 _mobileItems.AddRange(res.Items);
                 _total = res.TotalCount;
                 _pages = Math.Max(1, (int)Math.Ceiling(_total / (double)_pageSize));
 
-                await LoadCompanyNamesAsync(res.Items);
+                await LoadCompanyNamesAsync(res.Items, ct);
             }
             finally
             {
@@ -108,7 +120,7 @@ namespace Crm.Web.Components.Pages
             }
         }
 
-        async Task LoadCompanyNamesAsync(IEnumerable<Contact> contacts)
+        async Task LoadCompanyNamesAsync(IEnumerable<Contact> contacts, CancellationToken ct)
         {
             var ids = contacts
                 .Where(c => c.CompanyId.HasValue)
@@ -121,7 +133,7 @@ namespace Crm.Web.Components.Pages
             {
                 try
                 {
-                    var company = await CompanyService.GetByIdAsync(id);
+                    var company = await CompanyService.GetByIdAsync(id, ct);
                     _companyNames[id] = company.Name;
                 }
                 catch
@@ -186,5 +198,17 @@ namespace Crm.Web.Components.Pages
 
             builder.AddContent(0, _asc ? " ?" : " ?");
         };
+
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            _disposeCts.Cancel();
+            _disposeCts.Dispose();
+        }
     }
 }

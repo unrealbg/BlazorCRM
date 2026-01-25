@@ -65,7 +65,7 @@ namespace Crm.Web.Components.Pages
                     PageSize = 200,
                     SortBy = nameof(TaskItem.DueAt),
                     SortDir = "asc"
-                }, ownerId, priority, status);
+                }, ownerId, priority, status, null, null);
                 _items = res.Items.ToList();
             }
             finally
