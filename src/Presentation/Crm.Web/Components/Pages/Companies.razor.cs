@@ -27,12 +27,14 @@ namespace Crm.Web.Components.Pages
 
         DotNetObjectReference<Companies>? _selfRef;
         List<CompanyListItem> _items = new();
+        List<CompanyListItem> _mobileItems = new();
         string? _search;
         string? _industry;
         HashSet<string> _industries = new();
         string _sort = nameof(Crm.Domain.Entities.Company.Name);
         bool _asc = true;
         int _page = 1;
+        int _mobilePage = 1;
         int _pageSize = 10;
         int _total = 0;
         int _pages = 1;
@@ -75,6 +77,13 @@ namespace Crm.Web.Components.Pages
 
         async Task Reload()
         {
+            _page = 1;
+            _mobilePage = 1;
+            await LoadTablePageAsync(resetMobile: true);
+        }
+
+        async Task LoadTablePageAsync(bool resetMobile)
+        {
             _loading = true;
             try
             {
@@ -87,6 +96,11 @@ namespace Crm.Web.Components.Pages
                     SortDir = _asc ? "asc" : "desc"
                 }, _industry));
                 _items = res.Items.ToList();
+                if (resetMobile)
+                {
+                    _mobileItems = res.Items.ToList();
+                }
+
                 _total = res.TotalCount;
                 _pages = Math.Max(1, (int)Math.Ceiling(_total / (double)_pageSize));
 
@@ -96,10 +110,40 @@ namespace Crm.Web.Components.Pages
             finally { _loading = false; }
         }
 
+        async Task LoadMoreMobile()
+        {
+            if (_mobilePage >= _pages)
+            {
+                return;
+            }
+
+            _loading = true;
+            try
+            {
+                _mobilePage++;
+                var res = await Mediator.Send(new SearchCompanies(new PagedRequest
+                {
+                    Search = _search,
+                    Page = _mobilePage,
+                    PageSize = _pageSize,
+                    SortBy = _sort,
+                    SortDir = _asc ? "asc" : "desc"
+                }, _industry));
+                _mobileItems.AddRange(res.Items);
+                _total = res.TotalCount;
+                _pages = Math.Max(1, (int)Math.Ceiling(_total / (double)_pageSize));
+            }
+            finally
+            {
+                _loading = false;
+            }
+        }
+
         async Task ApplyFilters()
         {
             _page = 1;
-            await Reload();
+            _mobilePage = 1;
+            await LoadTablePageAsync(resetMobile: true);
         }
 
         async Task ClearFilters()
@@ -107,7 +151,8 @@ namespace Crm.Web.Components.Pages
             _search = null;
             _industry = null;
             _page = 1;
-            await Reload();
+            _mobilePage = 1;
+            await LoadTablePageAsync(resetMobile: true);
         }
 
         async Task LoadViewsAsync()
@@ -187,7 +232,8 @@ namespace Crm.Web.Components.Pages
             _asc = view.Asc;
             _pageSize = view.PageSize > 0 ? view.PageSize : _pageSize;
             _page = 1;
-            await Reload();
+            _mobilePage = 1;
+            await LoadTablePageAsync(resetMobile: true);
         }
 
         void SortBy(string prop)
@@ -202,17 +248,20 @@ namespace Crm.Web.Components.Pages
                 _asc = true;
             }
 
-            _page = 1; 
-            _ = Reload();
+            _page = 1;
+            _mobilePage = 1;
+            _ = LoadTablePageAsync(resetMobile: true);
         }
 
         void PrevPage()
         {
-            _page = Math.Max(1, _page - 1); _ = Reload();
+            _page = Math.Max(1, _page - 1);
+            _ = LoadTablePageAsync(resetMobile: false);
         }
         void NextPage()
         {
-            _page = Math.Min(_pages, _page + 1); _ = Reload();
+            _page = Math.Min(_pages, _page + 1);
+            _ = LoadTablePageAsync(resetMobile: false);
         }
 
         int StartRow => _total == 0 ? 0 : ((_page - 1) * _pageSize) + 1;

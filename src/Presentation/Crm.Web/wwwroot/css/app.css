@@ -295,6 +295,16 @@ footer {
   display: none;
 }
 
+.crm-tap {
+  min-height: 44px;
+  padding: 0.55rem 0.9rem;
+}
+
+.crm-card-actions .btn,
+.crm-card-actions .link {
+  min-height: 44px;
+}
+
 .crm-header-inner {
   height: 3rem;
 }
@@ -320,6 +330,20 @@ footer {
 
   main h1 {
     font-size: 1.4rem;
+  }
+
+  .crm-mobile-search {
+    position: sticky;
+    top: 2.75rem;
+    z-index: 20;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(10px);
+    margin-bottom: 0.75rem;
+    padding-top: 0.5rem;
+  }
+
+  .dark .crm-mobile-search {
+    background: rgba(2, 6, 23, 0.8);
   }
 
   header #globalSearch {
