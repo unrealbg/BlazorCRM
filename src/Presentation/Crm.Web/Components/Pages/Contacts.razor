@@ -1,6 +1,173 @@
 @page "/contacts"
+@using Crm.Domain.Entities
 
-<h1 class="text-2xl font-semibold mb-4">Contacts</h1>
-<div class="card p-6">
-  <div class="h-40 rounded-xl bg-gradient-to-b from-white/60 to-white/20 dark:from-slate-800/40 dark:to-slate-800/10"></div>
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+  <div>
+    <h1 class="crm-page-title text-2xl font-semibold">Contacts</h1>
+    <div class="text-xs text-slate-500">Manage people, ownership, and tags.</div>
+  </div>
+  <div class="flex items-center gap-2">
+    <UiButton Variant="primary" OnClick="Reload">Refresh</UiButton>
+  </div>
 </div>
+
+<div class="crm-mobile-search">
+  <UiCard Class="p-4 mb-4">
+    <div class="flex flex-wrap items-center gap-2">
+      <div class="min-w-[220px] flex-1">
+        <UiInput @bind-Value="_search" Placeholder="Search contacts..." />
+      </div>
+      <div class="w-36">
+        <InputSelect class="ui-select" @bind-Value="_pageSize">
+          <option value="5">5 / page</option>
+          <option value="10">10 / page</option>
+          <option value="20">20 / page</option>
+        </InputSelect>
+      </div>
+      <UiButton Variant="muted" OnClick="Reload">Apply</UiButton>
+      <div class="ml-auto text-xs text-slate-500">@(_total) results</div>
+    </div>
+  </UiCard>
+</div>
+
+<UiCard Class="p-0 crm-table-wrap">
+  <UiTable Class="min-w-full text-sm crm-table-desktop">
+    <thead class="bg-white/50 dark:bg-slate-800/40">
+      <tr class="text-slate-600 dark:text-slate-300">
+        <th class="px-4 py-3 text-left cursor-pointer" @onclick="() => SortBy(nameof(Contact.LastName))">Name @SortGlyph(nameof(Contact.LastName))</th>
+        <th class="px-4 py-3 text-left">Company</th>
+        <th class="px-4 py-3 text-left">Email</th>
+        <th class="px-4 py-3 text-left">Phone</th>
+        <th class="px-4 py-3 text-left">Tags</th>
+        <th class="px-4 py-3 text-right">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      @if (_loading)
+      {
+        @for (var i = 0; i < 5; i++)
+        {
+          <tr class="border-t border-white/40 dark:border-white/10">
+            <td class="px-4 py-3"><UiSkeleton Style="height:14px;width:160px" /></td>
+            <td class="px-4 py-3"><UiSkeleton Style="height:14px;width:120px" /></td>
+            <td class="px-4 py-3"><UiSkeleton Style="height:14px;width:140px" /></td>
+            <td class="px-4 py-3"><UiSkeleton Style="height:14px;width:120px" /></td>
+            <td class="px-4 py-3"><UiSkeleton Style="height:14px;width:100px" /></td>
+            <td class="px-4 py-3 text-right"><UiSkeleton Style="height:14px;width:80px;display:inline-block" /></td>
+          </tr>
+        }
+      }
+      else if (!_items.Any())
+      {
+        <tr><td class="px-4 py-6" colspan="6"><UiEmptyState Title="No contacts" Description="Try adjusting your search or add a new contact." /></td></tr>
+      }
+      else
+      {
+        @foreach (var c in _items)
+        {
+          <tr class="border-t border-white/40 dark:border-white/10">
+            <td class="px-4 py-3 font-medium">@DisplayName(c)</td>
+            <td class="px-4 py-3 text-slate-500">@CompanyLabel(c.CompanyId)</td>
+            <td class="px-4 py-3">@c.Email</td>
+            <td class="px-4 py-3">@c.Phone</td>
+            <td class="px-4 py-3">
+              @if (c.Tags?.Count > 0)
+              {
+                <div class="flex flex-wrap gap-1">
+                  @foreach (var t in c.Tags)
+                  {
+                    <span class="chip">@t</span>
+                  }
+                </div>
+              }
+            </td>
+            <td class="px-4 py-3 text-right">
+              <a class="link" href="/contacts/@c.Id">Open</a>
+            </td>
+          </tr>
+        }
+      }
+    </tbody>
+  </UiTable>
+</UiCard>
+
+<div class="crm-card-list">
+  @if (_loading)
+  {
+    @for (var i = 0; i < 5; i++)
+    {
+      <UiCard Class="p-4 mb-3">
+        <div class="space-y-2">
+          <UiSkeleton Style="height:14px;width:70%" />
+          <UiSkeleton Style="height:12px;width:50%" />
+          <UiSkeleton Style="height:12px;width:60%" />
+        </div>
+      </UiCard>
+    }
+  }
+  else if (!_mobileItems.Any())
+  {
+    <UiCard Class="p-4">
+      <UiEmptyState Title="No contacts" Description="Try adjusting your search or add a new contact." />
+    </UiCard>
+  }
+  else
+  {
+    @foreach (var c in _mobileItems)
+    {
+      <UiCard Class="p-4 mb-3">
+        <div class="space-y-2">
+          <div class="font-semibold">@DisplayName(c)</div>
+          <div class="text-xs text-slate-500">@CompanyLabel(c.CompanyId)</div>
+          @if (!string.IsNullOrWhiteSpace(c.Phone))
+          {
+            <div class="text-sm">@c.Phone</div>
+          }
+          @if (!string.IsNullOrWhiteSpace(c.Email))
+          {
+            <div class="text-sm">@c.Email</div>
+          }
+          @if (c.Tags?.Count > 0)
+          {
+            <div class="flex flex-wrap gap-1">
+              @foreach (var t in c.Tags)
+              {
+                <span class="chip">@t</span>
+              }
+            </div>
+          }
+          <div class="crm-card-actions flex flex-wrap gap-2 pt-2">
+            @if (!string.IsNullOrWhiteSpace(c.Phone))
+            {
+              <a class="btn btn-muted crm-tap" href="tel:@c.Phone">Call</a>
+            }
+            @if (!string.IsNullOrWhiteSpace(c.Email))
+            {
+              <a class="btn btn-muted crm-tap" href="mailto:@c.Email">Email</a>
+            }
+            <a class="btn btn-primary crm-tap" href="/contacts/@c.Id">Open details</a>
+          </div>
+        </div>
+      </UiCard>
+    }
+  }
+
+  @if (!_loading && _mobilePage < _pages)
+  {
+    <div class="mt-3">
+      <UiButton Variant="muted" Class="w-full crm-tap" OnClick="LoadMoreMobile">Load more</UiButton>
+      <div class="mt-2 text-xs text-slate-500 text-center">Showing @_mobileItems.Count of @_total</div>
+    </div>
+  }
+</div>
+
+@if (_pages > 1)
+{
+  <div class="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
+    <div>Showing @StartRow-@EndRow of @_total</div>
+    <div class="inline-flex gap-2">
+      <UiButton Variant="muted" Disabled="@(_page==1)" OnClick="PrevPage">Prev</UiButton>
+      <UiButton Variant="muted" Disabled="@(_page==_pages)" OnClick="NextPage">Next</UiButton>
+    </div>
+  </div>
+}
