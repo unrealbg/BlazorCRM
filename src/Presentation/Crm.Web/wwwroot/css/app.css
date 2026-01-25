@@ -45,6 +45,7 @@ html {
 }
 body {
   color: var(--color-text);
+  overflow-x: hidden;
 }
 h1,
 h2,
@@ -272,6 +273,91 @@ header {
 }
 footer {
   box-shadow: 0 -8px 24px rgba(2, 6, 23, 0.06);
+}
+
+.crm-shell {
+  min-width: 0;
+}
+
+.crm-main {
+  min-width: 0;
+}
+
+.crm-content {
+  min-width: 0;
+}
+
+.crm-table-wrap {
+  overflow-x: auto;
+}
+
+.crm-card-list {
+  display: none;
+}
+
+.crm-header-inner {
+  height: 3rem;
+}
+
+.crm-page-title {
+  line-height: 1.2;
+}
+
+.crm-footer {
+  min-height: 2.5rem;
+}
+
+@media (max-width: 1024px) {
+  #sidebar.is-collapsed {
+    width: 280px;
+  }
+}
+
+@media (max-width: 768px) {
+  .crm-header-inner {
+    height: 2.75rem;
+  }
+
+  main h1 {
+    font-size: 1.4rem;
+  }
+
+  header #globalSearch {
+    width: 100%;
+  }
+
+  .crm-page-title {
+    font-size: 1.4rem;
+  }
+
+  .crm-table-wrap {
+    display: none;
+  }
+
+  .crm-card-list {
+    display: block;
+  }
+
+  .crm-content {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .crm-footer > div {
+    height: 2.5rem;
+  }
+}
+
+@media (max-width: 1024px) {
+  .crm-sidebar {
+    width: min(85vw, 320px);
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+  }
+
+  .crm-sidebar.is-open {
+    transform: translateX(0);
+  }
 }
 
 nav a {

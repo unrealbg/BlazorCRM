@@ -1,6 +1,8 @@
-﻿<header class="sticky top-0 z-30 glass backdrop-blur-md border-b border-white/30 dark:border-white/10">
+﻿@rendermode InteractiveServer
+
+<header class="crm-header sticky top-0 z-30 glass backdrop-blur-md border-b border-white/30 dark:border-white/10">
     <div class="max-w-screen-2xl mx-auto px-3">
-        <div class="h-12 flex items-center justify-between gap-2">
+        <div class="crm-header-inner h-12 flex items-center justify-between gap-2">
             <div class="flex items-center gap-2">
                                 <button id="openSidebar" class="lg:hidden inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white/70 dark:bg-slate-800/60" @onclick="ToggleSidebar" aria-label="Open sidebar">
                                     <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

@@ -116,6 +116,7 @@
     if (!sb) return;
     sb.classList.remove("hidden");
     sb.classList.add("flex");
+    sb.classList.add("is-open");
     if (!isDesktop()) {
       const ov = ensureSidebarBackdrop();
       ov.style.display = "block";
@@ -125,6 +126,7 @@
   function closeSidebar() {
     const sb = qs("#sidebar");
     if (!sb) return;
+    sb.classList.remove("is-open");
     sb.classList.add("hidden");
     sb.classList.remove("flex");
     const ov = qs("#sidebar-backdrop");
