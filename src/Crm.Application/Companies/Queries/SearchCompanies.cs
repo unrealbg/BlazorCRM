@@ -12,7 +12,6 @@ namespace Crm.Application.Companies.Queries
     public sealed class SearchCompaniesHandler : IRequestHandler<SearchCompanies, PagedResult<CompanyListItem>>
     {
         private readonly ICompanyService _companies;
-
         public SearchCompaniesHandler(ICompanyService companies) => _companies = companies;
 
         public async Task<PagedResult<CompanyListItem>> Handle(SearchCompanies r, CancellationToken ct)

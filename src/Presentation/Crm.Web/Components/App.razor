@@ -90,14 +90,14 @@
 
   <QuickCreateModal />
 
-  <div id="commandPalette" class="fixed inset-0 z-[70] hidden">
-    <div class="absolute inset-0 bg-black/40" data-palette-close></div>
-    <div class="relative mx-auto mt-20 w-full max-w-2xl card p-3">
+  <div id="searchOverlay" class="crm-search-overlay fixed inset-0 z-[70] hidden">
+    <div class="crm-search-backdrop" data-search-close></div>
+    <div class="crm-search-panel">
       <div class="flex items-center gap-2">
-        <input id="paletteSearch" type="search" class="input w-full" placeholder="Search everything..." autocomplete="off" />
+        <input id="searchOverlayInput" type="search" class="input w-full" placeholder="Search everything..." autocomplete="off" />
         <span class="text-[11px] text-slate-500">Esc</span>
       </div>
-      <div id="paletteResults" class="mt-2 max-h-80 overflow-auto"></div>
+      <div id="searchOverlayResults" class="mt-3 max-h-[70vh] overflow-auto"></div>
     </div>
   </div>
 
