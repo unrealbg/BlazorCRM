@@ -26,6 +26,7 @@ using System.Text;
 using System.Security.Claims;
 using Crm.Infrastructure.Security;
 using Crm.Contracts.Auth;
+using Crm.Contracts.Paging;
 using Crm.Contracts.Search;
 using MediatR;
 using Crm.Application.Companies;
@@ -1075,51 +1076,13 @@ api.MapDelete("/tasks/{id:guid}", async (Guid id, [FromServices] IMediator m) =>
 
 // Search + filter + sort + paging
 api.MapGet("/companies", async (
-    [FromQuery] string? search,
+    [AsParameters] PagedRequest request,
     [FromQuery] string? industry,
-    [FromQuery] string? sort,
-    [FromQuery] bool? asc,
-    [FromQuery] int? page,
-    [FromQuery] int? pageSize,
-    CrmDbContext db) =>
+    [FromServices] ICompanyService companies,
+    CancellationToken ct) =>
 {
-    var pageValue = page.GetValueOrDefault(1);
-    var pageSizeValue = pageSize.GetValueOrDefault(10);
-    pageValue = pageValue <= 0 ? 1 : pageValue;
-    pageSizeValue = pageSizeValue is <= 0 or > 200 ? 10 : pageSizeValue;
-
-    IQueryable<Crm.Domain.Entities.Company> q = db.Companies.AsNoTracking();
-
-    if (!string.IsNullOrWhiteSpace(search))
-    {
-        var s = search.Trim();
-        q = q.Where(c =>
-            EF.Functions.Like(c.Name, $"%{s}%") ||
-            (c.Industry != null && EF.Functions.Like(c.Industry, $"%{s}%")) ||
-            (c.Address != null && EF.Functions.Like(c.Address, $"%{s}%"))
-        );
-    }
-
-    if (!string.IsNullOrWhiteSpace(industry))
-    {
-        q = q.Where(c => c.Industry != null && c.Industry == industry);
-    }
-
-    sort = string.IsNullOrWhiteSpace(sort) ? nameof(Crm.Domain.Entities.Company.Name) : sort;
-    var ascOrder = asc.GetValueOrDefault() || string.IsNullOrWhiteSpace(sort);
-
-    q = (sort, ascOrder) switch
-    {
-        (nameof(Crm.Domain.Entities.Company.Name), true) => q.OrderBy(c => c.Name),
-        (nameof(Crm.Domain.Entities.Company.Name), false) => q.OrderByDescending(c => c.Name),
-        (nameof(Crm.Domain.Entities.Company.Industry), true) => q.OrderBy(c => c.Industry),
-        (nameof(Crm.Domain.Entities.Company.Industry), false) => q.OrderByDescending(c => c.Industry),
-        _ => q.OrderBy(c => c.Name)
-    };
-
-    var total = await q.CountAsync();
-    var items = await q.Skip((pageValue - 1) * pageSizeValue).Take(pageSizeValue).ToListAsync();
-    return Results.Ok(new { items, total });
+    var res = await companies.SearchAsync(request, industry, ct);
+    return Results.Ok(res);
 }).CacheOutput("companies");
 
 // Distinct industries for filter menu

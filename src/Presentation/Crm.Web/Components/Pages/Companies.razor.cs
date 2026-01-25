@@ -1,6 +1,7 @@
 namespace Crm.Web.Components.Pages
 {
     using Crm.Application.Companies.Queries;
+    using Crm.Contracts.Paging;
 
     using MediatR;
 
@@ -77,9 +78,16 @@ namespace Crm.Web.Components.Pages
             _loading = true;
             try
             {
-                var res = await Mediator.Send(new SearchCompanies(_search, _industry, _sort, _asc, _page, _pageSize));
+                var res = await Mediator.Send(new SearchCompanies(new PagedRequest
+                {
+                    Search = _search,
+                    Page = _page,
+                    PageSize = _pageSize,
+                    SortBy = _sort,
+                    SortDir = _asc ? "asc" : "desc"
+                }, _industry));
                 _items = res.Items.ToList();
-                _total = res.Total;
+                _total = res.TotalCount;
                 _pages = Math.Max(1, (int)Math.Ceiling(_total / (double)_pageSize));
 
                 var list = await Mediator.Send(new DistinctIndustries(_search));

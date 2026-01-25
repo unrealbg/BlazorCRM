@@ -198,6 +198,23 @@ curl -X POST https://localhost:5001/api/auth/logout \
 Companies
 
 - GET /api/companies — search/filter/sort/pagination
+
+### Paging and sorting
+
+All list/search endpoints and services use a shared paging model:
+
+- Request: `page` (1-based), `pageSize` (max 200, clamped), `sortBy`, `sortDir` (`asc`/`desc`), `search` (optional)
+- Response: `items`, `totalCount`, `page`, `pageSize`
+
+Deterministic ordering is enforced by appending `Id` as a tie-breaker to every sort.
+
+Supported sort keys (defaults shown):
+
+- Companies: `Name` (asc), `Industry`, `CreatedAtUtc`
+- Contacts: `LastName` (asc), `FirstName`, `Email`, `CreatedAtUtc`
+- Deals: `Title` (asc), `Amount`, `Probability`, `CloseDate`, `CreatedAtUtc`
+- Activities: `DueAt` (desc), `Status`, `Type`, `CreatedAtUtc`
+- Tasks: `DueAt` (asc), `Priority`, `Status`, `Title`, `CreatedAtUtc`
 - POST /api/companies — create
 - PUT /api/companies/{id} — update
 - DELETE /api/companies/{id} — delete
@@ -206,7 +223,7 @@ Companies
 Example: list companies with filter/sort/paging
 
 ```bash
-curl "https://localhost:5001/api/companies?search=soft&industry=SaaS&sort=Name&asc=true&page=1&pageSize=10" \
+curl "https://localhost:5001/api/companies?search=soft&industry=SaaS&sortBy=Name&sortDir=asc&page=1&pageSize=10" \
   -H "Authorization: Bearer <accessToken>"
 ```
 
@@ -218,13 +235,12 @@ Response:
     {
       "id": "...",
       "name": "Acme",
-      "industry": "SaaS",
-      "tags": ["key"],
-      "address": "...",
-      "tenantId": "..."
+      "industry": "SaaS"
     }
   ],
-  "total": 1
+  "totalCount": 1,
+  "page": 1,
+  "pageSize": 10
 }
 ```
 

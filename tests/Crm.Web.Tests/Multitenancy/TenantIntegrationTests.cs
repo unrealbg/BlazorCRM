@@ -130,7 +130,7 @@ namespace Crm.Web.Tests.Multitenancy
             Assert.Equal(HttpStatusCode.OK, res.StatusCode);
 
             using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
-            var total = doc.RootElement.GetProperty("total").GetInt32();
+            var total = doc.RootElement.GetProperty("totalCount").GetInt32();
             Assert.Equal(1, total);
         }
 
@@ -163,7 +163,7 @@ namespace Crm.Web.Tests.Multitenancy
             Assert.Equal(HttpStatusCode.OK, res.StatusCode);
 
             using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
-            var total = doc.RootElement.GetProperty("total").GetInt32();
+            var total = doc.RootElement.GetProperty("totalCount").GetInt32();
             Assert.Equal(1, total);
         }
 

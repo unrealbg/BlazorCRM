@@ -1,6 +1,7 @@
 namespace Crm.Web.Components.Pages
 {
     using Crm.Application.Services;
+    using Crm.Contracts.Paging;
     using Crm.Domain.Entities;
     using Crm.Domain.Enums;
 
@@ -57,7 +58,14 @@ namespace Crm.Web.Components.Pages
                     status = st;
                 }
 
-                var res = await Service.SearchAsync(_filter, ownerId, priority, status, page: 1, pageSize: 200);
+                var res = await Service.SearchAsync(new PagedRequest
+                {
+                    Search = _filter,
+                    Page = 1,
+                    PageSize = 200,
+                    SortBy = nameof(TaskItem.DueAt),
+                    SortDir = "asc"
+                }, ownerId, priority, status);
                 _items = res.Items.ToList();
             }
             finally

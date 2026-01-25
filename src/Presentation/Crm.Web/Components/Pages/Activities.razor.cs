@@ -1,6 +1,7 @@
 namespace Crm.Web.Components.Pages
 {
     using Crm.Application.Services;
+    using Crm.Contracts.Paging;
     using Crm.UI.Components;
 
     using Microsoft.AspNetCore.Components;
@@ -28,7 +29,13 @@ namespace Crm.Web.Components.Pages
             _loading = true;
             try
             {
-                                var res = await Service.GetPageAsync(page: 1, pageSize: 50);
+                                var res = await Service.GetPageAsync(new PagedRequest
+                                {
+                                    Page = 1,
+                                    PageSize = 50,
+                                    SortBy = nameof(Crm.Domain.Entities.Activity.DueAt),
+                                    SortDir = "desc"
+                                });
                                 _items = res.Items
                                     .Select(a => new ActivityTimelineItem(
                     Icon: a.Type switch { Crm.Domain.Enums.ActivityType.Call => "??", Crm.Domain.Enums.ActivityType.Meeting => "??", Crm.Domain.Enums.ActivityType.Email => "??", _ => "??" },
