@@ -46,37 +46,106 @@
   }
   else
   {
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-      @foreach (var s in _stages)
-      {
-        var list = _dealsByStage.TryGetValue(s.Id, out var v) ? v : new List<Deal>();
-        var hovered = _hoveredStageId == s.Id;
-        <StageColumn Title="@s.Name" Count="@list.Count" Class="@(hovered ? "ring-2 ring-brand-500/50" : null)" OnDrop="e => OnDropAsync(s.Id)" OnDragOver="OnDragOver" OnDragEnter="e => OnDragEnter(s.Id)" OnDragLeave="e => OnDragLeave(s.Id)">
-          <div class="space-y-2 min-h-10">
-            @foreach (var d in list)
-            {
-              var isGhost = _ghostDealId == d.Id;
-              <AuthorizeView Policy="@Permissions.Deals_Move">
-                <Authorized Context="auth">
-                  <div class="ui-card p-3 transition-opacity cursor-pointer" style="opacity:@(isGhost ? 0.5 : 1)" draggable="true" @ondragstart="e => OnDragStart(d)" @onclick="() => OpenDrawer(d)">
-                    <div class="font-medium truncate">@d.Title</div>
-                    <div class="text-xs text-slate-500">@d.Amount.ToString("C0") @if(!string.IsNullOrEmpty(d.Currency)){<span class="ml-1">@d.Currency</span>}</div>
-                  </div>
-                </Authorized>
-                <NotAuthorized>
-                  <div class="ui-card p-3 cursor-pointer" @onclick="() => OpenDrawer(d)">
-                    <div class="font-medium truncate">@d.Title</div>
-                    <div class="text-xs text-slate-500">@d.Amount.ToString("C0") @if(!string.IsNullOrEmpty(d.Currency)){<span class="ml-1">@d.Currency</span>}</div>
-                  </div>
-                </NotAuthorized>
-              </AuthorizeView>
-            }
-          </div>
-        </StageColumn>
-      }
+    <div class="crm-kanban">
+      <div class="crm-kanban-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+        @foreach (var s in _stages)
+        {
+          var list = _dealsByStage.TryGetValue(s.Id, out var v) ? v : new List<Deal>();
+          var hovered = _hoveredStageId == s.Id;
+          <StageColumn Title="@s.Name" Count="@list.Count" Class="@($"crm-kanban-col {(hovered ? "ring-2 ring-brand-500/50" : string.Empty)}")" OnDrop="e => OnDropAsync(s.Id)" OnDragOver="OnDragOver" OnDragEnter="e => OnDragEnter(s.Id)" OnDragLeave="e => OnDragLeave(s.Id)">
+            <div class="space-y-2 min-h-10">
+              @foreach (var d in list)
+              {
+                var isGhost = _ghostDealId == d.Id;
+                <AuthorizeView Policy="@Permissions.Deals_Move">
+                  <Authorized Context="auth">
+                    <div class="ui-card crm-deal-card transition-opacity cursor-pointer @(isGhost ? "crm-deal-ghost" : string.Empty)" draggable="true" @ondragstart="e => OnDragStart(d)" @onclick="() => OpenDrawer(d)">
+                      <div class="flex items-start justify-between gap-2">
+                        <div class="min-w-0">
+                          <div class="font-semibold truncate">@d.Title</div>
+                          <div class="text-xs text-slate-500">@d.Amount.ToString("C0") @if(!string.IsNullOrEmpty(d.Currency)){<span class="ml-1">@d.Currency</span>}</div>
+                        </div>
+                        <button class="crm-deal-move md:hidden" type="button" @onclick="() => OpenMoveSheet(d)" @onclick:stopPropagation="true">Move</button>
+                      </div>
+                      <div class="mt-2 text-xs text-slate-500 crm-deal-meta">
+                        <span class="truncate">@DealPartyLabel(d)</span>
+                        <span class="mx-1 text-slate-300">•</span>
+                        <span class="truncate">@OwnerName(d.OwnerId)</span>
+                      </div>
+                      <button class="crm-deal-more md:hidden" type="button" @onclick="() => ToggleDealDetails(d.Id)" @onclick:stopPropagation="true">@(IsDealExpanded(d.Id) ? "Less" : "More")</button>
+                      <div class="crm-deal-more-panel @(IsDealExpanded(d.Id) ? "is-open" : string.Empty)">
+                        <div class="text-xs text-slate-500">Stage: @(_stageNameMap.TryGetValue(d.StageId, out var stageName) ? stageName : "Stage")</div>
+                        <div class="text-xs text-slate-500">Probability: @d.Probability%</div>
+                        @if (d.CloseDate is not null)
+                        {
+                          <div class="text-xs text-slate-500">Close: @d.CloseDate.Value.ToString("d")</div>
+                        }
+                      </div>
+                    </div>
+                  </Authorized>
+                  <NotAuthorized>
+                    <div class="ui-card crm-deal-card cursor-pointer" @onclick="() => OpenDrawer(d)">
+                      <div class="flex items-start justify-between gap-2">
+                        <div class="min-w-0">
+                          <div class="font-semibold truncate">@d.Title</div>
+                          <div class="text-xs text-slate-500">@d.Amount.ToString("C0") @if(!string.IsNullOrEmpty(d.Currency)){<span class="ml-1">@d.Currency</span>}</div>
+                        </div>
+                      </div>
+                      <div class="mt-2 text-xs text-slate-500 crm-deal-meta">
+                        <span class="truncate">@DealPartyLabel(d)</span>
+                        <span class="mx-1 text-slate-300">•</span>
+                        <span class="truncate">@OwnerName(d.OwnerId)</span>
+                      </div>
+                      <button class="crm-deal-more md:hidden" type="button" @onclick="() => ToggleDealDetails(d.Id)" @onclick:stopPropagation="true">@(IsDealExpanded(d.Id) ? "Less" : "More")</button>
+                      <div class="crm-deal-more-panel @(IsDealExpanded(d.Id) ? "is-open" : string.Empty)">
+                        <div class="text-xs text-slate-500">Stage: @(_stageNameMap.TryGetValue(d.StageId, out var stageName2) ? stageName2 : "Stage")</div>
+                        <div class="text-xs text-slate-500">Probability: @d.Probability%</div>
+                        @if (d.CloseDate is not null)
+                        {
+                          <div class="text-xs text-slate-500">Close: @d.CloseDate.Value.ToString("d")</div>
+                        }
+                      </div>
+                    </div>
+                  </NotAuthorized>
+                </AuthorizeView>
+              }
+            </div>
+          </StageColumn>
+        }
+      </div>
     </div>
   }
 </UiCard>
+
+<AuthorizeView Policy="@Permissions.Deals_Move">
+  <Authorized>
+    @if (_showMoveSheet && _moveDeal is not null)
+    {
+      <div class="crm-mobile-sheet" role="dialog" aria-label="Move deal">
+        <div class="crm-mobile-sheet-backdrop" @onclick="CloseMoveSheet"></div>
+        <div class="crm-mobile-sheet-panel">
+          <div class="flex items-center justify-between mb-2">
+            <div class="font-semibold text-sm truncate">Move "@_moveDeal.Title"</div>
+            <button class="crm-sheet-close" type="button" @onclick="CloseMoveSheet">Close</button>
+          </div>
+          <div class="space-y-1">
+            @foreach (var s in _stages)
+            {
+              var isCurrent = _moveDeal.StageId == s.Id;
+              <button class="crm-sheet-item @(isCurrent ? "is-active" : string.Empty)" type="button" @onclick="() => MoveDealToStageMobileAsync(_moveDeal!, s.Id)">
+                <span>@s.Name</span>
+                @if (isCurrent)
+                {
+                  <span class="text-xs text-slate-500">Current</span>
+                }
+              </button>
+            }
+          </div>
+        </div>
+      </div>
+    }
+  </Authorized>
+</AuthorizeView>
 
 <UiDrawer @bind-Open="_drawerOpen" Title="Deal quick edit">
   @if (_drawerDeal is null)

@@ -8,6 +8,7 @@ namespace Crm.Web.Components.Pages
 
     using Microsoft.AspNetCore.Components;
     using Microsoft.AspNetCore.Components.Web;
+    using Microsoft.AspNetCore.Identity;
 
     using System;
     using System.Collections.Generic;
@@ -25,6 +26,15 @@ namespace Crm.Web.Components.Pages
         [Inject] 
         IActivityService ActivityService { get; set; } = default!;
 
+        [Inject]
+        ICompanyService CompanyService { get; set; } = default!;
+
+        [Inject]
+        IContactService ContactService { get; set; } = default!;
+
+        [Inject]
+        UserManager<IdentityUser> UserManager { get; set; } = default!;
+
         bool _loading = true;
         List<Pipeline> _pipelines = new();
         List<Stage> _stages = new();
@@ -39,6 +49,12 @@ namespace Crm.Web.Components.Pages
         List<ActivityTimelineItem> _timeline = new();
         bool _loadingTimeline;
         Dictionary<Guid, string> _stageNameMap = new();
+        Dictionary<Guid, string> _companyNames = new();
+        Dictionary<Guid, string> _contactNames = new();
+        List<IdentityUser> _users = new();
+        HashSet<Guid> _expandedDealIds = new();
+        Deal? _moveDeal;
+        bool _showMoveSheet;
 
         Guid SelectedPipelineId
         {
@@ -89,6 +105,10 @@ namespace Crm.Web.Components.Pages
                         SortBy = nameof(Deal.Amount),
                         SortDir = "desc"
                     }, pipelineId: _selectedPipelineId)).Items;
+
+                _users = UserManager.Users.ToList();
+                await LoadCompanyNamesAsync(deals);
+                await LoadContactNamesAsync(deals);
 
                 foreach (var g in deals.GroupBy(d => d.StageId))
                 {
@@ -202,5 +222,156 @@ namespace Crm.Web.Components.Pages
                 await Reload();
             }
         }
+
+        void ToggleDealDetails(Guid dealId)
+        {
+            if (!_expandedDealIds.Add(dealId))
+            {
+                _expandedDealIds.Remove(dealId);
+            }
+        }
+
+        bool IsDealExpanded(Guid dealId) => _expandedDealIds.Contains(dealId);
+
+        void OpenMoveSheet(Deal deal)
+        {
+            _moveDeal = deal;
+            _showMoveSheet = true;
+        }
+
+        void CloseMoveSheet()
+        {
+            _showMoveSheet = false;
+            _moveDeal = null;
+        }
+
+        async Task MoveDealToStageMobileAsync(Deal deal, Guid targetStageId)
+        {
+            if (deal.StageId == targetStageId)
+            {
+                CloseMoveSheet();
+                return;
+            }
+
+            if (_dealsByStage.TryGetValue(deal.StageId, out var from) && _dealsByStage.TryGetValue(targetStageId, out var to))
+            {
+                from.Remove(deal);
+                deal.StageId = targetStageId;
+                to.Insert(0, deal);
+                StateHasChanged();
+            }
+
+            CloseMoveSheet();
+
+            var ok = await DealService.MoveToStageAsync(deal.Id, targetStageId);
+            if (!ok)
+            {
+                await Reload();
+            }
+        }
+
+        async Task LoadCompanyNamesAsync(IEnumerable<Deal> deals)
+        {
+            var ids = deals
+                .Where(d => d.CompanyId.HasValue)
+                .Select(d => d.CompanyId!.Value)
+                .Distinct()
+                .Where(id => !_companyNames.ContainsKey(id))
+                .ToList();
+
+            foreach (var id in ids)
+            {
+                try
+                {
+                    var company = await CompanyService.GetByIdAsync(id);
+                    _companyNames[id] = company.Name;
+                }
+                catch
+                {
+                    // ignore missing company
+                }
+            }
+        }
+
+        async Task LoadContactNamesAsync(IEnumerable<Deal> deals)
+        {
+            var ids = deals
+                .Where(d => d.ContactId.HasValue)
+                .Select(d => d.ContactId!.Value)
+                .Distinct()
+                .Where(id => !_contactNames.ContainsKey(id))
+                .ToList();
+
+            foreach (var id in ids)
+            {
+                try
+                {
+                    var contact = await ContactService.GetByIdAsync(id);
+                    _contactNames[id] = ContactDisplayName(contact);
+                }
+                catch
+                {
+                    // ignore missing contact
+                }
+            }
+        }
+
+        string DealPartyLabel(Deal d)
+        {
+            var parts = new List<string>();
+
+            if (d.CompanyId.HasValue)
+            {
+                parts.Add(CompanyName(d.CompanyId));
+            }
+
+            if (d.ContactId.HasValue)
+            {
+                parts.Add(ContactName(d.ContactId));
+            }
+
+            return parts.Count == 0 ? "No company/contact" : string.Join(" / ", parts);
+        }
+
+        string CompanyName(Guid? companyId)
+        {
+            if (companyId is null)
+            {
+                return "No company";
+            }
+
+            return _companyNames.TryGetValue(companyId.Value, out var name)
+                ? name
+                : companyId.Value.ToString();
+        }
+
+        string ContactName(Guid? contactId)
+        {
+            if (contactId is null)
+            {
+                return "No contact";
+            }
+
+            return _contactNames.TryGetValue(contactId.Value, out var name)
+                ? name
+                : contactId.Value.ToString();
+        }
+
+        string OwnerName(Guid? ownerId)
+        {
+            if (ownerId is null)
+            {
+                return "Unassigned";
+            }
+
+            var id = ownerId.Value.ToString();
+            var user = _users.FirstOrDefault(u => u.Id == id);
+            return user is null ? id : DisplayName(user);
+        }
+
+        static string DisplayName(IdentityUser u)
+          => string.IsNullOrWhiteSpace(u.Email) ? (u.UserName ?? u.Id) : u.Email!;
+
+        static string ContactDisplayName(Contact c) => $"{c.FirstName} {c.LastName}";
     }
 }
