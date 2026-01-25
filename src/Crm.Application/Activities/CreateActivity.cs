@@ -9,13 +9,14 @@ namespace Crm.Application.Activities
     using Crm.Application.Security;
 
     [RequiresPermission(Permissions.Activities_Write)]
-    public sealed record CreateActivity(ActivityType Type, Guid? RelatedId, DateTime? DueAt, ActivityStatus Status, string? Notes) : IRequest<Guid>;
+    public sealed record CreateActivity(ActivityType Type, RelatedToType RelatedTo, Guid? RelatedId, DateTime? DueAt, ActivityStatus Status, string? Notes) : IRequest<Guid>;
 
     public sealed class CreateActivityValidator : AbstractValidator<CreateActivity>
     {
         public CreateActivityValidator()
         {
             RuleFor(x => x.Type).IsInEnum();
+            RuleFor(x => x.RelatedTo).IsInEnum();
         }
     }
 
@@ -26,7 +27,7 @@ namespace Crm.Application.Activities
 
         public async Task<Guid> Handle(CreateActivity r, CancellationToken ct)
         {
-            var a = new Activity { Id = Guid.Empty, Type = r.Type, RelatedId = r.RelatedId, DueAt = r.DueAt, Status = r.Status, Notes = r.Notes };
+            var a = new Activity { Id = Guid.Empty, Type = r.Type, RelatedTo = r.RelatedTo, RelatedId = r.RelatedId, DueAt = r.DueAt, Status = r.Status, Notes = r.Notes };
             var saved = await _svc.UpsertAsync(a, ct);
             return saved.Id;
         }

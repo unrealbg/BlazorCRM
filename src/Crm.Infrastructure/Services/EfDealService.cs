@@ -32,8 +32,10 @@ namespace Crm.Infrastructure.Services
 
             if (pipelineId is Guid pid)
             {
-                var stageIds = _db.Stages.Where(s => s.PipelineId == pid).Select(s => s.Id);
-                q = q.Where(d => stageIds.Contains(d.StageId));
+                q = from d in q
+                    join s in _db.Stages on d.StageId equals s.Id
+                    where s.PipelineId == pid
+                    select d;
             }
 
             var page = request.Page <= 0 ? 1 : request.Page;

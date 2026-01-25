@@ -1,0 +1,81 @@
+@rendermode InteractiveServer
+@using Crm.Application.Activities
+@using Crm.Application.Tasks
+
+<div class="crm-fab-wrap">
+  <button class="crm-fab" type="button" @onclick="OpenSheet" aria-label="Quick add">
+    <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 5v14"></path>
+      <path d="M5 12h14"></path>
+    </svg>
+  </button>
+</div>
+
+<div class="crm-quickadd-sheet @(_sheetOpen ? "is-open" : string.Empty)">
+  <div class="crm-quickadd-backdrop" @onclick="CloseSheet"></div>
+  <div class="crm-quickadd-panel">
+    <div class="flex items-center justify-between mb-3">
+      <div class="font-semibold text-base">Quick add</div>
+      <button class="ui-btn ui-btn-muted" type="button" @onclick="CloseSheet">Close</button>
+    </div>
+
+    @if (_relatedTo != RelatedToType.None && _relatedId is not null)
+    {
+      <div class="text-xs text-slate-500 mb-3">Linked to @_relatedTo</div>
+    }
+
+    <div class="grid grid-cols-3 gap-2 mb-4">
+      <button class="ui-btn @(_mode == QuickAddMode.Activity ? "ui-btn-primary" : "ui-btn-muted")" type="button" @onclick="() => SetMode(QuickAddMode.Activity)">Add Activity</button>
+      <button class="ui-btn @(_mode == QuickAddMode.Note ? "ui-btn-primary" : "ui-btn-muted")" type="button" @onclick="() => SetMode(QuickAddMode.Note)">Add Note</button>
+      <button class="ui-btn @(_mode == QuickAddMode.Task ? "ui-btn-primary" : "ui-btn-muted")" type="button" @onclick="() => SetMode(QuickAddMode.Task)">Add Task</button>
+    </div>
+
+    @if (_mode == QuickAddMode.Activity)
+    {
+      <div class="space-y-3">
+        <div>
+          <label class="text-sm block mb-1">Type</label>
+          <InputSelect class="ui-select" @bind-Value="_activity.Type">
+            @foreach (var t in Enum.GetValues<ActivityType>())
+            {
+              <option value="@t">@t</option>
+            }
+          </InputSelect>
+        </div>
+        <div>
+          <label class="text-sm block mb-1">Notes</label>
+          <textarea class="ui-input" rows="3" @bind="_activity.Notes"></textarea>
+        </div>
+        <div>
+          <label class="text-sm block mb-1">Due date</label>
+          <input class="ui-input" type="date" @bind="_activity.DueAt" />
+        </div>
+        <button class="ui-btn ui-btn-primary" type="button" disabled="@_busy" @onclick="SaveActivityAsync">@(_busy ? "Saving..." : "Save Activity")</button>
+      </div>
+    }
+    else if (_mode == QuickAddMode.Note)
+    {
+      <div class="space-y-3">
+        <div>
+          <label class="text-sm block mb-1">Note</label>
+          <textarea class="ui-input" rows="4" @bind="_note.Notes"></textarea>
+        </div>
+        <button class="ui-btn ui-btn-primary" type="button" disabled="@_busy" @onclick="SaveNoteAsync">@(_busy ? "Saving..." : "Save Note")</button>
+      </div>
+    }
+    else if (_mode == QuickAddMode.Task)
+    {
+      <div class="space-y-3">
+        <div>
+          <label class="text-sm block mb-1">Title</label>
+          <UiInput @bind-Value="_task.Title" Placeholder="Task title" />
+        </div>
+        <div>
+          <label class="text-sm block mb-1">Due date</label>
+          <input class="ui-input" type="date" @bind="_task.DueAt" />
+        </div>
+        <button class="ui-btn ui-btn-primary" type="button" disabled="@_busy" @onclick="SaveTaskAsync">@(_busy ? "Saving..." : "Save Task")</button>
+      </div>
+    }
+  </div>
+</div>

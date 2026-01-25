@@ -17,6 +17,8 @@ namespace Crm.Infrastructure.Services
             Guid? ownerId = null,
             Crm.Domain.Enums.TaskPriority? priority = null,
             Crm.Domain.Enums.TaskStatus? status = null,
+            Crm.Domain.Enums.RelatedToType? relatedTo = null,
+            Guid? relatedId = null,
             CancellationToken ct = default)
         {
             IQueryable<TaskItem> q = _db.Tasks.AsNoTracking();
@@ -40,6 +42,11 @@ namespace Crm.Infrastructure.Services
             if (status is not null)
             {
                 q = q.Where(t => t.Status == status);
+            }
+
+            if (relatedTo is not null && relatedId is Guid rid)
+            {
+                q = q.Where(t => t.RelatedTo == relatedTo && t.RelatedId == rid);
             }
 
             var page = request.Page <= 0 ? 1 : request.Page;

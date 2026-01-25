@@ -45,6 +45,8 @@ namespace Crm.Web.Components.Pages
         string? _selectedView;
         string? _newViewName;
         const string ViewsKey = "crm:companyViews";
+        readonly CancellationTokenSource _disposeCts = new();
+        bool _disposed;
 
         void ShowQuickCreate() => JS.InvokeVoidAsync("openModal", "modalQuickCreate");
 
@@ -87,6 +89,7 @@ namespace Crm.Web.Components.Pages
             _loading = true;
             try
             {
+                var ct = _disposeCts.Token;
                 var res = await Mediator.Send(new SearchCompanies(new PagedRequest
                 {
                     Search = _search,
@@ -94,7 +97,8 @@ namespace Crm.Web.Components.Pages
                     PageSize = _pageSize,
                     SortBy = _sort,
                     SortDir = _asc ? "asc" : "desc"
-                }, _industry));
+                }, _industry), ct);
+                if (ct.IsCancellationRequested) return;
                 _items = res.Items.ToList();
                 if (resetMobile)
                 {
@@ -104,7 +108,8 @@ namespace Crm.Web.Components.Pages
                 _total = res.TotalCount;
                 _pages = Math.Max(1, (int)Math.Ceiling(_total / (double)_pageSize));
 
-                var list = await Mediator.Send(new DistinctIndustries(_search));
+                var list = await Mediator.Send(new DistinctIndustries(_search), ct);
+                if (ct.IsCancellationRequested) return;
                 _industries = list.ToHashSet(StringComparer.OrdinalIgnoreCase);
             }
             finally { _loading = false; }
@@ -120,6 +125,7 @@ namespace Crm.Web.Components.Pages
             _loading = true;
             try
             {
+                var ct = _disposeCts.Token;
                 _mobilePage++;
                 var res = await Mediator.Send(new SearchCompanies(new PagedRequest
                 {
@@ -128,7 +134,8 @@ namespace Crm.Web.Components.Pages
                     PageSize = _pageSize,
                     SortBy = _sort,
                     SortDir = _asc ? "asc" : "desc"
-                }, _industry));
+                }, _industry), ct);
+                if (ct.IsCancellationRequested) return;
                 _mobileItems.AddRange(res.Items);
                 _total = res.TotalCount;
                 _pages = Math.Max(1, (int)Math.Ceiling(_total / (double)_pageSize));
@@ -292,6 +299,13 @@ namespace Crm.Web.Components.Pages
 
         public async ValueTask DisposeAsync()
         {
+            if (!_disposed)
+            {
+                _disposed = true;
+                _disposeCts.Cancel();
+                _disposeCts.Dispose();
+            }
+
             if (_selfRef is not null)
             {
                 _selfRef.Dispose();
