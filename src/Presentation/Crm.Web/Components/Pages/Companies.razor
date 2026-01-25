@@ -7,7 +7,7 @@
 
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
   <div>
-    <h1 class="text-2xl font-semibold">Companies</h1>
+    <h1 class="crm-page-title text-2xl font-semibold">Companies</h1>
     <div class="text-xs text-slate-500">Manage accounts, filters, and saved views.</div>
   </div>
   <div class="flex items-center gap-2">
@@ -56,8 +56,8 @@
   </div>
 </UiCard>
 
-<UiCard Class="p-0 overflow-x-auto">
-  <UiTable Class="min-w-full text-sm">
+<UiCard Class="p-0 crm-table-wrap">
+  <UiTable Class="min-w-full text-sm crm-table-desktop">
     <thead class="bg-white/50 dark:bg-slate-800/40">
       <tr class="text-slate-600 dark:text-slate-300">
         <th class="px-4 py-3 text-left cursor-pointer" @onclick="() => SortBy(nameof(Crm.Domain.Entities.Company.Name))">Company @SortGlyph(nameof(Crm.Domain.Entities.Company.Name))</th>
@@ -98,6 +98,49 @@
     </tbody>
   </UiTable>
 </UiCard>
+
+<div class="crm-card-list">
+  @if (_loading)
+  {
+    @for (var i = 0; i < 5; i++)
+    {
+      <UiCard Class="p-4 mb-3">
+        <div class="space-y-2">
+          <UiSkeleton Style="height:14px;width:70%" />
+          <UiSkeleton Style="height:12px;width:40%" />
+          <div class="flex gap-2">
+            <UiSkeleton Style="height:14px;width:64px" />
+            <UiSkeleton Style="height:14px;width:64px" />
+          </div>
+        </div>
+      </UiCard>
+    }
+  }
+  else if (!_items.Any())
+  {
+    <UiCard Class="p-4">
+      <UiEmptyState Title="No companies" Description="Try adjusting your filters or create a new company." />
+    </UiCard>
+  }
+  else
+  {
+    @foreach (var c in _items)
+    {
+      <UiCard Class="p-4 mb-3">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <div class="font-semibold">@c.Name</div>
+            <div class="text-xs text-slate-500">@c.Industry</div>
+          </div>
+          <div class="flex gap-2">
+            <button class="link" @onclick="() => View(c.Id)">View</button>
+            <button class="link" @onclick="() => Edit(c.Id)">Edit</button>
+          </div>
+        </div>
+      </UiCard>
+    }
+  }
+</div>
 
 @if (_pages > 1)
 {
