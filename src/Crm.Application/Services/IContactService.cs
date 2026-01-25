@@ -1,13 +1,12 @@
 namespace Crm.Application.Services
 {
+    using Crm.Contracts.Paging;
     using Crm.Domain.Entities;
 
     public interface IContactService
     {
-        Task<Crm.Application.Common.Models.PagedResult<Contact>> SearchAsync(
-            string? search = null,
-            int page = 1,
-            int pageSize = 50,
+        Task<PagedResult<Contact>> SearchAsync(
+            PagedRequest request,
             CancellationToken ct = default);
 
         Task<Contact> GetByIdAsync(Guid id, CancellationToken ct = default);

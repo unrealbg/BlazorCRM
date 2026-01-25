@@ -1,16 +1,13 @@
 namespace Crm.Application.Services
 {
+    using Crm.Contracts.Paging;
     using Crm.Domain.Entities;
 
     public interface ICompanyService
     {
-        Task<Crm.Application.Common.Models.PagedResult<Crm.Application.Companies.Queries.CompanyListItem>> SearchAsync(
-            string? search,
+        Task<PagedResult<Crm.Application.Companies.Queries.CompanyListItem>> SearchAsync(
+            PagedRequest request,
             string? industry,
-            string sort,
-            bool asc,
-            int page,
-            int pageSize,
             CancellationToken ct = default);
 
         Task<string[]> GetDistinctIndustriesAsync(string? search = null, CancellationToken ct = default);

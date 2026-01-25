@@ -1,15 +1,15 @@
 namespace Crm.Application.Services
 {
+    using Crm.Contracts.Paging;
     using Crm.Domain.Entities;
 
     public interface IDealService
     {
-        Task<Crm.Application.Common.Models.PagedResult<Deal>> GetPageAsync(
+        Task<PagedResult<Deal>> GetPageAsync(
+            PagedRequest request,
             Guid? pipelineId = null,
             Guid? stageId = null,
             Guid? ownerId = null,
-            int page = 1,
-            int pageSize = 200,
             CancellationToken ct = default);
 
         Task<Deal> GetByIdAsync(Guid id, CancellationToken ct = default);

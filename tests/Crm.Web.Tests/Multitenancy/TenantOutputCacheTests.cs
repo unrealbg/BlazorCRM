@@ -143,7 +143,7 @@ namespace Crm.Web.Tests.Multitenancy
             var t1Res = await client.GetAsync("/api/companies?page=1&pageSize=50");
             Assert.Equal(HttpStatusCode.OK, t1Res.StatusCode);
             using var t1Doc = JsonDocument.Parse(await t1Res.Content.ReadAsStringAsync());
-            var t1Total = t1Doc.RootElement.GetProperty("total").GetInt32();
+            var t1Total = t1Doc.RootElement.GetProperty("totalCount").GetInt32();
             Assert.Equal(1, t1Total);
 
             var t1Cached = await client.GetAsync("/api/companies?page=1&pageSize=50");
@@ -154,7 +154,7 @@ namespace Crm.Web.Tests.Multitenancy
             var t2Res = await client.GetAsync("/api/companies?page=1&pageSize=50");
             Assert.Equal(HttpStatusCode.OK, t2Res.StatusCode);
             using var t2Doc = JsonDocument.Parse(await t2Res.Content.ReadAsStringAsync());
-            var t2Total = t2Doc.RootElement.GetProperty("total").GetInt32();
+            var t2Total = t2Doc.RootElement.GetProperty("totalCount").GetInt32();
             Assert.Equal(1, t2Total);
 
             var t2Cached = await client.GetAsync("/api/companies?page=1&pageSize=50");

@@ -1,6 +1,7 @@
 namespace Crm.Infrastructure.Services
 {
     using Crm.Application.Services;
+    using Crm.Contracts.Paging;
     using Crm.Domain.Entities;
     using Crm.Infrastructure.Persistence;
     using Microsoft.EntityFrameworkCore;
@@ -11,12 +12,11 @@ namespace Crm.Infrastructure.Services
 
         public EfActivityService(CrmDbContext db) => _db = db;
 
-        public async Task<Crm.Application.Common.Models.PagedResult<Activity>> GetPageAsync(
+        public async Task<PagedResult<Activity>> GetPageAsync(
+            PagedRequest request,
             Guid? relatedId = null,
             Crm.Domain.Enums.ActivityType? type = null,
             Crm.Domain.Enums.ActivityStatus? status = null,
-            int page = 1,
-            int pageSize = 50,
             CancellationToken ct = default)
         {
             IQueryable<Activity> q = _db.Activities.AsNoTracking();
@@ -35,10 +35,28 @@ namespace Crm.Infrastructure.Services
                 q = q.Where(a => a.Status == status);
             }
 
-            var ordered = q.OrderByDescending(a => a.DueAt ?? DateTime.MaxValue).ThenBy(a => a.Id);
+            var page = request.Page <= 0 ? 1 : request.Page;
+            var pageSize = request.PageSize <= 0 ? 50 : Math.Min(request.PageSize, 200);
+            var sort = string.IsNullOrWhiteSpace(request.SortBy) ? nameof(Activity.DueAt) : request.SortBy;
+            var desc = string.IsNullOrWhiteSpace(request.SortDir) && string.IsNullOrWhiteSpace(request.SortBy)
+                ? true
+                : string.Equals(request.SortDir, "desc", StringComparison.OrdinalIgnoreCase);
+
+            var ordered = (sort, desc) switch
+            {
+                (nameof(Activity.DueAt), false) => q.OrderBy(a => a.DueAt ?? DateTime.MaxValue).ThenBy(a => a.Id),
+                (nameof(Activity.DueAt), true) => q.OrderByDescending(a => a.DueAt ?? DateTime.MaxValue).ThenByDescending(a => a.Id),
+                (nameof(Activity.CreatedAtUtc), false) => q.OrderBy(a => a.CreatedAtUtc).ThenBy(a => a.Id),
+                (nameof(Activity.CreatedAtUtc), true) => q.OrderByDescending(a => a.CreatedAtUtc).ThenByDescending(a => a.Id),
+                (nameof(Activity.Status), false) => q.OrderBy(a => a.Status).ThenBy(a => a.Id),
+                (nameof(Activity.Status), true) => q.OrderByDescending(a => a.Status).ThenByDescending(a => a.Id),
+                (nameof(Activity.Type), false) => q.OrderBy(a => a.Type).ThenBy(a => a.Id),
+                (nameof(Activity.Type), true) => q.OrderByDescending(a => a.Type).ThenByDescending(a => a.Id),
+                _ => q.OrderByDescending(a => a.DueAt ?? DateTime.MaxValue).ThenByDescending(a => a.Id)
+            };
             var total = await ordered.CountAsync(ct);
             var items = await ordered.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
-            return new Crm.Application.Common.Models.PagedResult<Activity>(items, total);
+            return new PagedResult<Activity>(items, total, page, pageSize);
         }
 
         public async Task<Activity> GetByIdAsync(Guid id, CancellationToken ct = default) =>

@@ -1,6 +1,7 @@
 namespace Crm.Infrastructure.Services
 {
     using Crm.Application.Services;
+    using Crm.Contracts.Paging;
     using Crm.Domain.Entities;
     using Crm.Infrastructure.Persistence;
     using Microsoft.EntityFrameworkCore;
@@ -11,20 +12,18 @@ namespace Crm.Infrastructure.Services
 
         public EfTaskService(CrmDbContext db) => _db = db;
 
-        public async Task<Crm.Application.Common.Models.PagedResult<TaskItem>> SearchAsync(
-            string? filter = null,
+        public async Task<PagedResult<TaskItem>> SearchAsync(
+            PagedRequest request,
             Guid? ownerId = null,
             Crm.Domain.Enums.TaskPriority? priority = null,
             Crm.Domain.Enums.TaskStatus? status = null,
-            int page = 1,
-            int pageSize = 50,
             CancellationToken ct = default)
         {
             IQueryable<TaskItem> q = _db.Tasks.AsNoTracking();
 
-            if (!string.IsNullOrWhiteSpace(filter))
+            if (!string.IsNullOrWhiteSpace(request.Search))
             {
-                var f = filter.Trim();
+                var f = request.Search.Trim();
                 q = q.Where(t => EF.Functions.ILike(t.Title, $"%{f}%"));
             }
 
@@ -43,10 +42,28 @@ namespace Crm.Infrastructure.Services
                 q = q.Where(t => t.Status == status);
             }
 
-            var ordered = q.OrderBy(t => t.DueAt ?? DateTime.MaxValue).ThenBy(t => t.Id);
+            var page = request.Page <= 0 ? 1 : request.Page;
+            var pageSize = request.PageSize <= 0 ? 50 : Math.Min(request.PageSize, 200);
+            var sort = string.IsNullOrWhiteSpace(request.SortBy) ? nameof(TaskItem.DueAt) : request.SortBy;
+            var desc = string.Equals(request.SortDir, "desc", StringComparison.OrdinalIgnoreCase);
+
+            var ordered = (sort, desc) switch
+            {
+                (nameof(TaskItem.DueAt), false) => q.OrderBy(t => t.DueAt ?? DateTime.MaxValue).ThenBy(t => t.Id),
+                (nameof(TaskItem.DueAt), true) => q.OrderByDescending(t => t.DueAt ?? DateTime.MinValue).ThenByDescending(t => t.Id),
+                (nameof(TaskItem.Priority), false) => q.OrderBy(t => t.Priority).ThenBy(t => t.Id),
+                (nameof(TaskItem.Priority), true) => q.OrderByDescending(t => t.Priority).ThenByDescending(t => t.Id),
+                (nameof(TaskItem.Status), false) => q.OrderBy(t => t.Status).ThenBy(t => t.Id),
+                (nameof(TaskItem.Status), true) => q.OrderByDescending(t => t.Status).ThenByDescending(t => t.Id),
+                (nameof(TaskItem.Title), false) => q.OrderBy(t => t.Title).ThenBy(t => t.Id),
+                (nameof(TaskItem.Title), true) => q.OrderByDescending(t => t.Title).ThenByDescending(t => t.Id),
+                (nameof(TaskItem.CreatedAtUtc), false) => q.OrderBy(t => t.CreatedAtUtc).ThenBy(t => t.Id),
+                (nameof(TaskItem.CreatedAtUtc), true) => q.OrderByDescending(t => t.CreatedAtUtc).ThenByDescending(t => t.Id),
+                _ => q.OrderBy(t => t.DueAt ?? DateTime.MaxValue).ThenBy(t => t.Id)
+            };
             var total = await ordered.CountAsync(ct);
             var items = await ordered.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
-            return new Crm.Application.Common.Models.PagedResult<TaskItem>(items, total);
+            return new PagedResult<TaskItem>(items, total, page, pageSize);
         }
 
         public async Task<TaskItem> GetByIdAsync(Guid id, CancellationToken ct = default) =>

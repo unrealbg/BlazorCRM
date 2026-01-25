@@ -1,4 +1,5 @@
 @using Crm.Application.Services
+@using Crm.Contracts.Paging
 @using Crm.Domain.Enums
 @using Crm.UI.Components
 @using Microsoft.AspNetCore.Identity
@@ -114,7 +115,13 @@
     if (!string.IsNullOrEmpty(_filterStatus) && Enum.TryParse<ActivityStatus>(_filterStatus, out var fs))
       status = fs;
 
-    var res = await Service.GetPageAsync(RelatedId, type, status, page: 1, pageSize: 50);
+    var res = await Service.GetPageAsync(new PagedRequest
+    {
+      Page = 1,
+      PageSize = 50,
+      SortBy = nameof(Crm.Domain.Entities.Activity.DueAt),
+      SortDir = "desc"
+    }, RelatedId, type, status);
 
     _items = res.Items
       .Select(a => new ActivityTimelineItem(

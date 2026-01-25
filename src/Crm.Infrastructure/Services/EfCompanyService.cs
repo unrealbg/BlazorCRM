@@ -2,6 +2,7 @@ namespace Crm.Infrastructure.Services
 {
     using System.Text;
     using Crm.Application.Services;
+    using Crm.Contracts.Paging;
     using Crm.Domain.Entities;
     using Crm.Infrastructure.Persistence;
     using Microsoft.EntityFrameworkCore;
@@ -15,19 +16,15 @@ namespace Crm.Infrastructure.Services
             _db = db;
         }
 
-        public async Task<Crm.Application.Common.Models.PagedResult<Crm.Application.Companies.Queries.CompanyListItem>> SearchAsync(
-            string? search,
+        public async Task<PagedResult<Crm.Application.Companies.Queries.CompanyListItem>> SearchAsync(
+            PagedRequest request,
             string? industry,
-            string sort,
-            bool asc,
-            int page,
-            int pageSize,
             CancellationToken ct = default)
         {
             IQueryable<Company> q = _db.Companies.AsNoTracking();
-            if (!string.IsNullOrWhiteSpace(search))
+            if (!string.IsNullOrWhiteSpace(request.Search))
             {
-                var s = search.Trim();
+                var s = request.Search.Trim();
                 q = q.Where(c =>
                     EF.Functions.Like(c.Name, $"%{s}%") ||
                     (c.Industry != null && EF.Functions.Like(c.Industry, $"%{s}%")) ||
@@ -40,13 +37,20 @@ namespace Crm.Infrastructure.Services
                 q = q.Where(c => c.Industry != null && c.Industry == industry);
             }
 
-            var ordered = (sort, asc) switch
+            var page = request.Page <= 0 ? 1 : request.Page;
+            var pageSize = request.PageSize <= 0 ? 10 : Math.Min(request.PageSize, 200);
+            var sort = string.IsNullOrWhiteSpace(request.SortBy) ? nameof(Company.Name) : request.SortBy;
+            var desc = string.Equals(request.SortDir, "desc", StringComparison.OrdinalIgnoreCase);
+
+            var ordered = (sort, desc) switch
             {
-                (nameof(Company.Name), true) => q.OrderBy(c => c.Name),
-                (nameof(Company.Name), false) => q.OrderByDescending(c => c.Name),
-                (nameof(Company.Industry), true) => q.OrderBy(c => c.Industry),
-                (nameof(Company.Industry), false) => q.OrderByDescending(c => c.Industry),
-                _ => q.OrderBy(c => c.Name)
+                (nameof(Company.Name), false) => q.OrderBy(c => c.Name).ThenBy(c => c.Id),
+                (nameof(Company.Name), true) => q.OrderByDescending(c => c.Name).ThenByDescending(c => c.Id),
+                (nameof(Company.Industry), false) => q.OrderBy(c => c.Industry).ThenBy(c => c.Id),
+                (nameof(Company.Industry), true) => q.OrderByDescending(c => c.Industry).ThenByDescending(c => c.Id),
+                (nameof(Company.CreatedAtUtc), false) => q.OrderBy(c => c.CreatedAtUtc).ThenBy(c => c.Id),
+                (nameof(Company.CreatedAtUtc), true) => q.OrderByDescending(c => c.CreatedAtUtc).ThenByDescending(c => c.Id),
+                _ => q.OrderBy(c => c.Name).ThenBy(c => c.Id)
             };
 
             var total = await ordered.CountAsync(ct);
@@ -56,7 +60,7 @@ namespace Crm.Infrastructure.Services
                 .Select(c => new Crm.Application.Companies.Queries.CompanyListItem(c.Id, c.Name, c.Industry))
                 .ToListAsync(ct);
 
-            return new Crm.Application.Common.Models.PagedResult<Crm.Application.Companies.Queries.CompanyListItem>(items, total);
+            return new PagedResult<Crm.Application.Companies.Queries.CompanyListItem>(items, total, page, pageSize);
         }
 
         public async Task<string[]> GetDistinctIndustriesAsync(string? search = null, CancellationToken ct = default)

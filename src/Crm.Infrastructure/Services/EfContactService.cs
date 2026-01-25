@@ -2,6 +2,7 @@ namespace Crm.Infrastructure.Services
 {
     using System.Text;
     using Crm.Application.Services;
+    using Crm.Contracts.Paging;
     using Crm.Domain.Entities;
     using Crm.Infrastructure.Persistence;
     using Microsoft.EntityFrameworkCore;
@@ -15,16 +16,14 @@ namespace Crm.Infrastructure.Services
             _db = db;
         }
 
-        public async Task<Crm.Application.Common.Models.PagedResult<Contact>> SearchAsync(
-            string? search = null,
-            int page = 1,
-            int pageSize = 50,
+        public async Task<PagedResult<Contact>> SearchAsync(
+            PagedRequest request,
             CancellationToken ct = default)
         {
             IQueryable<Contact> q = _db.Contacts.AsNoTracking();
-            if (!string.IsNullOrWhiteSpace(search))
+            if (!string.IsNullOrWhiteSpace(request.Search))
             {
-                var s = search.Trim();
+                var s = request.Search.Trim();
                 q = q.Where(c =>
                     EF.Functions.Like(c.FirstName, $"%{s}%") ||
                     EF.Functions.Like(c.LastName, $"%{s}%") ||
@@ -33,10 +32,26 @@ namespace Crm.Infrastructure.Services
                 );
             }
 
-            var ordered = q.OrderBy(c => c.LastName).ThenBy(c => c.FirstName).ThenBy(c => c.Id);
+            var page = request.Page <= 0 ? 1 : request.Page;
+            var pageSize = request.PageSize <= 0 ? 50 : Math.Min(request.PageSize, 200);
+            var sort = string.IsNullOrWhiteSpace(request.SortBy) ? nameof(Contact.LastName) : request.SortBy;
+            var desc = string.Equals(request.SortDir, "desc", StringComparison.OrdinalIgnoreCase);
+
+            var ordered = (sort, desc) switch
+            {
+                (nameof(Contact.LastName), false) => q.OrderBy(c => c.LastName).ThenBy(c => c.FirstName).ThenBy(c => c.Id),
+                (nameof(Contact.LastName), true) => q.OrderByDescending(c => c.LastName).ThenByDescending(c => c.FirstName).ThenByDescending(c => c.Id),
+                (nameof(Contact.FirstName), false) => q.OrderBy(c => c.FirstName).ThenBy(c => c.LastName).ThenBy(c => c.Id),
+                (nameof(Contact.FirstName), true) => q.OrderByDescending(c => c.FirstName).ThenByDescending(c => c.LastName).ThenByDescending(c => c.Id),
+                (nameof(Contact.Email), false) => q.OrderBy(c => c.Email).ThenBy(c => c.Id),
+                (nameof(Contact.Email), true) => q.OrderByDescending(c => c.Email).ThenByDescending(c => c.Id),
+                (nameof(Contact.CreatedAtUtc), false) => q.OrderBy(c => c.CreatedAtUtc).ThenBy(c => c.Id),
+                (nameof(Contact.CreatedAtUtc), true) => q.OrderByDescending(c => c.CreatedAtUtc).ThenByDescending(c => c.Id),
+                _ => q.OrderBy(c => c.LastName).ThenBy(c => c.FirstName).ThenBy(c => c.Id)
+            };
             var total = await ordered.CountAsync(ct);
             var items = await ordered.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
-            return new Crm.Application.Common.Models.PagedResult<Contact>(items, total);
+            return new PagedResult<Contact>(items, total, page, pageSize);
         }
 
         public async Task<Contact> GetByIdAsync(Guid id, CancellationToken ct = default)

@@ -1,16 +1,15 @@
 namespace Crm.Application.Services
 {
+    using Crm.Contracts.Paging;
     using Crm.Domain.Entities;
 
     public interface ITaskService
     {
-        Task<Crm.Application.Common.Models.PagedResult<TaskItem>> SearchAsync(
-            string? filter = null,
+        Task<PagedResult<TaskItem>> SearchAsync(
+            PagedRequest request,
             Guid? ownerId = null,
             Crm.Domain.Enums.TaskPriority? priority = null,
             Crm.Domain.Enums.TaskStatus? status = null,
-            int page = 1,
-            int pageSize = 50,
             CancellationToken ct = default);
 
         Task<TaskItem> GetByIdAsync(Guid id, CancellationToken ct = default);
