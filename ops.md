@@ -5,7 +5,9 @@
 ### Recommended production workflow
 
 1. Apply migrations out-of-band (recommended):
-  - `dotnet Crm.Web.dll --migrate`
+
+- `dotnet Crm.Web.dll --migrate`
+
 2. Start the app normally after migrations complete.
 3. Keep `Database:AutoMigrate` set to `false` in production.
 

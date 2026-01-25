@@ -1,6 +1,7 @@
 namespace Crm.Infrastructure.Files
 {
     using Crm.Application.Files;
+    using Microsoft.AspNetCore.Http;
     using Microsoft.AspNetCore.Hosting;
     using Microsoft.Extensions.Options;
 
@@ -10,10 +11,16 @@ namespace Crm.Infrastructure.Files
         private readonly string _rootPrefix;
         private readonly AttachmentStorageOptions _options;
         private readonly StringComparison _pathComparison;
+        private readonly long _maxUploadBytes;
+        private readonly int _maxFileNameLength;
 
         public LocalFileStorage(IWebHostEnvironment env, IOptions<AttachmentStorageOptions> options)
         {
             _options = options.Value;
+            _maxUploadBytes = _options.MaxUploadBytes > 0
+                ? _options.MaxUploadBytes
+                : (_options.MaxFileSizeBytes > 0 ? _options.MaxFileSizeBytes : 10 * 1024 * 1024);
+            _maxFileNameLength = _options.MaxFileNameLength > 0 ? _options.MaxFileNameLength : 120;
 
             var baseRoot = env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
             var configured = _options.UploadsRootPath;
@@ -37,7 +44,7 @@ namespace Crm.Infrastructure.Files
             ValidateContentType(contentType);
 
             var safeTenant = SanitizeSegment(string.IsNullOrWhiteSpace(tenantSlug) ? tenantId.ToString("N") : tenantSlug);
-            var safeName = SanitizeFileName(fileName);
+            var safeName = SanitizeFileName(fileName, _maxFileNameLength);
             var year = DateTime.UtcNow.ToString("yyyy");
             var relativePath = Path.Combine(safeTenant, year, $"{Guid.NewGuid():N}_{safeName}");
             var relativeForStorage = relativePath.Replace('/', Path.DirectorySeparatorChar);
@@ -52,13 +59,15 @@ namespace Crm.Infrastructure.Files
 
         public Task<Stream> OpenReadAsync(string path, CancellationToken ct)
         {
-            var fullPath = GetFullPathFromRelative(path);
+            var normalized = NormalizeExistingPath(path, out var relative);
+            var fullPath = GetFullPathFromRelative(normalized ? relative : path);
             return Task.FromResult<Stream>(File.OpenRead(fullPath));
         }
 
         public Task DeleteAsync(string path, CancellationToken ct)
         {
-            var fullPath = GetFullPathFromRelative(path);
+            var normalized = NormalizeExistingPath(path, out var relative);
+            var fullPath = GetFullPathFromRelative(normalized ? relative : path);
             if (File.Exists(fullPath))
             {
                 File.Delete(fullPath);
@@ -71,12 +80,12 @@ namespace Crm.Infrastructure.Files
         {
             if (string.IsNullOrWhiteSpace(relativePath))
             {
-                throw new InvalidOperationException("Invalid attachment path.");
+                throw new AttachmentStorageException("Invalid attachment path.", StatusCodes.Status400BadRequest);
             }
 
             if (Path.IsPathRooted(relativePath))
             {
-                throw new InvalidOperationException("Absolute attachment paths are not allowed.");
+                throw new AttachmentStorageException("Absolute attachment paths are not allowed.", StatusCodes.Status400BadRequest);
             }
 
             var normalized = relativePath.Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar);
@@ -84,10 +93,34 @@ namespace Crm.Infrastructure.Files
 
             if (!fullPath.StartsWith(_rootPrefix, _pathComparison))
             {
-                throw new InvalidOperationException("Attachment path traversal detected.");
+                throw new AttachmentStorageException("Attachment path traversal detected.", StatusCodes.Status400BadRequest);
             }
 
             return fullPath;
+        }
+
+        public bool NormalizeExistingPath(string path, out string relativePath)
+        {
+            relativePath = string.Empty;
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                throw new AttachmentStorageException("Invalid attachment path.", StatusCodes.Status400BadRequest);
+            }
+
+            if (!Path.IsPathRooted(path))
+            {
+                return false;
+            }
+
+            var fullPath = Path.GetFullPath(path);
+            if (!fullPath.StartsWith(_rootPrefix, _pathComparison))
+            {
+                throw new AttachmentStorageException("Attachment path is outside uploads root.", StatusCodes.Status400BadRequest);
+            }
+
+            var relative = Path.GetRelativePath(_root, fullPath);
+            relativePath = relative.Replace(Path.DirectorySeparatorChar, '/');
+            return true;
         }
 
         private void ValidateContentType(string contentType)
@@ -97,17 +130,17 @@ namespace Crm.Infrastructure.Files
                 var allowed = new HashSet<string>(_options.AllowedContentTypes, StringComparer.OrdinalIgnoreCase);
                 if (!allowed.Contains(contentType))
                 {
-                    throw new InvalidOperationException("Attachment content type is not allowed.");
+                    throw new AttachmentStorageException("Attachment content type is not allowed.", StatusCodes.Status415UnsupportedMediaType);
                 }
             }
         }
 
         private async Task CopyToAsyncWithLimit(Stream source, Stream destination, CancellationToken ct)
         {
-            var max = _options.MaxFileSizeBytes;
+            var max = _maxUploadBytes;
             if (max > 0 && source.CanSeek && source.Length > max)
             {
-                throw new InvalidOperationException($"Attachment exceeds max size of {max} bytes.");
+                throw new AttachmentStorageException($"Attachment exceeds max size of {max} bytes.", StatusCodes.Status413PayloadTooLarge);
             }
 
             var buffer = new byte[81920];
@@ -118,7 +151,7 @@ namespace Crm.Infrastructure.Files
                 total += read;
                 if (max > 0 && total > max)
                 {
-                    throw new InvalidOperationException($"Attachment exceeds max size of {max} bytes.");
+                    throw new AttachmentStorageException($"Attachment exceeds max size of {max} bytes.", StatusCodes.Status413PayloadTooLarge);
                 }
 
                 await destination.WriteAsync(buffer.AsMemory(0, read), ct);
@@ -132,11 +165,21 @@ namespace Crm.Infrastructure.Files
             return string.IsNullOrWhiteSpace(name) ? "tenant" : name;
         }
 
-        private static string SanitizeFileName(string fileName)
+        public static string SanitizeFileName(string fileName, int maxLength)
         {
             var name = Path.GetFileName(fileName);
             name = string.Join("_", name.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
-            return string.IsNullOrWhiteSpace(name) ? "file" : name;
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return "file";
+            }
+
+            if (maxLength > 0 && name.Length > maxLength)
+            {
+                name = name[..maxLength];
+            }
+
+            return name;
         }
     }
 }
