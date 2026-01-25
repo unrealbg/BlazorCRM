@@ -133,10 +133,12 @@ namespace Crm.Web.Tests.Search
             Assert.Equal(HttpStatusCode.OK, res.StatusCode);
             var json = await res.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(json);
-            Assert.True(doc.RootElement.GetArrayLength() > 0);
+            var companies = doc.RootElement.GetProperty("companies");
+            var contacts = doc.RootElement.GetProperty("contacts");
+            var deals = doc.RootElement.GetProperty("deals");
 
-            var hasCompany = doc.RootElement.EnumerateArray().Any(x => x.GetProperty("type").GetString() == "company");
-            Assert.True(hasCompany);
+            Assert.True(companies.GetArrayLength() + contacts.GetArrayLength() + deals.GetArrayLength() > 0);
+            Assert.True(companies.EnumerateArray().Any(x => x.GetProperty("type").GetString() == "company"));
         }
 
         [Fact]
@@ -151,7 +153,13 @@ namespace Crm.Web.Tests.Search
             Assert.Equal(HttpStatusCode.OK, res.StatusCode);
             var json = await res.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(json);
-            Assert.Equal(0, doc.RootElement.GetArrayLength());
+            var companies = doc.RootElement.GetProperty("companies");
+            var contacts = doc.RootElement.GetProperty("contacts");
+            var deals = doc.RootElement.GetProperty("deals");
+
+            Assert.Equal(0, companies.GetArrayLength());
+            Assert.Equal(0, contacts.GetArrayLength());
+            Assert.Equal(0, deals.GetArrayLength());
         }
     }
 }

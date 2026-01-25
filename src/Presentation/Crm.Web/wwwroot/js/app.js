@@ -43,23 +43,23 @@
     if (el) el.classList.add("hidden");
   }
 
-  let paletteEl = null;
-  let paletteInput = null;
-  let palettePanel = null;
-  function openPalette() {
-    paletteEl = paletteEl || qs("#commandPalette");
-    paletteInput = paletteInput || qs("#paletteSearch");
-    palettePanel = palettePanel || qs("#paletteResults");
-    if (!paletteEl || !paletteInput || !palettePanel) return;
-    paletteEl.classList.remove("hidden");
-    paletteInput.focus();
-    paletteInput.select();
+  let searchOverlayEl = null;
+  let searchOverlayInput = null;
+  let searchOverlayPanel = null;
+  function openSearchOverlay() {
+    searchOverlayEl = searchOverlayEl || qs("#searchOverlay");
+    searchOverlayInput = searchOverlayInput || qs("#searchOverlayInput");
+    searchOverlayPanel = searchOverlayPanel || qs("#searchOverlayResults");
+    if (!searchOverlayEl || !searchOverlayInput || !searchOverlayPanel) return;
+    searchOverlayEl.classList.remove("hidden");
+    searchOverlayInput.focus();
+    searchOverlayInput.select();
   }
-  function closePalette() {
-    if (!paletteEl || !palettePanel) return;
-    paletteEl.classList.add("hidden");
-    palettePanel.classList.add("hidden");
-    palettePanel.innerHTML = "";
+  function closeSearchOverlay() {
+    if (!searchOverlayEl || !searchOverlayPanel) return;
+    searchOverlayEl.classList.add("hidden");
+    searchOverlayPanel.classList.add("hidden");
+    searchOverlayPanel.innerHTML = "";
   }
   function showToast(text, kind) {
     const wrap = qs("#toasts");
@@ -179,7 +179,7 @@
     });
   }
 
-  function wirePaletteShortcut() {
+  function wireSearchShortcut() {
     document.addEventListener(
       "keydown",
       (e) => {
@@ -190,7 +190,7 @@
         if (combo) {
           e.preventDefault();
           e.stopPropagation();
-          openPalette();
+          openSearchOverlay();
         }
       },
       true,
@@ -203,6 +203,7 @@
     let items = [];
     let selected = -1;
     let timer = null;
+    let controller = null;
 
     const close = () => {
       panel.classList.add("hidden");
@@ -212,31 +213,56 @@
       options?.onClose?.();
     };
 
-    const render = () => {
+    const createRow = (item, idx, sectionItems) => {
+      const row = document.createElement("div");
+      row.className =
+        "crm-search-row px-3 py-2 rounded-lg cursor-pointer flex flex-col gap-1 " +
+        (idx === selected ? "bg-white/60 dark:bg-slate-700/50" : "");
+      row.dataset.url = item.url;
+      row.innerHTML = `<div class="text-sm font-medium">${item.title}</div><div class="text-xs text-slate-500">${item.subtitle ?? item.type}</div>`;
+      row.addEventListener("mouseenter", () => {
+        selected = idx;
+        renderGrouped(sectionItems);
+      });
+      row.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        window.location.href = item.url;
+        if (options?.closeOnSelect) close();
+      });
+      return row;
+    };
+
+    const renderGrouped = (grouped) => {
       panel.innerHTML = "";
-      if (items.length === 0) {
+
+      const sections = [
+        { key: "companies", title: "Companies" },
+        { key: "contacts", title: "Contacts" },
+        { key: "deals", title: "Deals" },
+      ];
+
+      const allItems = sections.flatMap((s) => grouped?.[s.key] ?? []);
+      if (!allItems.length) {
         panel.innerHTML =
           '<div class="px-3 py-2 text-sm text-slate-500">No results</div>';
-      } else {
-        items.forEach((item, idx) => {
-          const row = document.createElement("div");
-          row.className =
-            "px-3 py-2 rounded-lg cursor-pointer flex flex-col gap-1 " +
-            (idx === selected ? "bg-white/60 dark:bg-slate-700/50" : "");
-          row.dataset.url = item.url;
-          row.innerHTML = `<div class="text-sm font-medium">${item.title}</div><div class="text-xs text-slate-500">${item.subtitle ?? item.type}</div>`;
-          row.addEventListener("mouseenter", () => {
-            selected = idx;
-            render();
-          });
-          row.addEventListener("mousedown", (e) => {
-            e.preventDefault();
-            window.location.href = item.url;
-            if (options?.closeOnSelect) close();
-          });
-          panel.appendChild(row);
-        });
+        panel.classList.remove("hidden");
+        return;
       }
+
+      let index = 0;
+      sections.forEach((section) => {
+        const sectionItems = grouped?.[section.key] ?? [];
+        if (!sectionItems.length) return;
+        const header = document.createElement("div");
+        header.className = "crm-search-group";
+        header.textContent = section.title;
+        panel.appendChild(header);
+        sectionItems.forEach((item) => {
+          panel.appendChild(createRow(item, index, grouped));
+          index += 1;
+        });
+      });
+
       panel.classList.remove("hidden");
     };
 
@@ -246,16 +272,23 @@
         return;
       }
       try {
+        if (controller) controller.abort();
+        controller = new AbortController();
         const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`, {
           credentials: "include",
+          signal: controller.signal,
         });
         if (!res.ok) {
           close();
           return;
         }
         items = await res.json();
-        selected = items.length > 0 ? 0 : -1;
-        render();
+        const flatItems =
+          (items?.companies ?? []).length +
+          (items?.contacts ?? []).length +
+          (items?.deals ?? []).length;
+        selected = flatItems > 0 ? 0 : -1;
+        renderGrouped(items);
       } catch {
         close();
       }
@@ -264,22 +297,31 @@
     input.addEventListener("input", () => {
       const q = input.value.trim();
       if (timer) clearTimeout(timer);
-      timer = setTimeout(() => fetchResults(q), 200);
+      timer = setTimeout(() => fetchResults(q), 300);
     });
 
     input.addEventListener("keydown", (e) => {
       if (panel.classList.contains("hidden")) return;
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        selected = Math.min(items.length - 1, selected + 1);
-        render();
+        const flatCount =
+          (items?.companies ?? []).length +
+          (items?.contacts ?? []).length +
+          (items?.deals ?? []).length;
+        selected = Math.min(flatCount - 1, selected + 1);
+        renderGrouped(items);
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
         selected = Math.max(0, selected - 1);
-        render();
+        renderGrouped(items);
       } else if (e.key === "Enter") {
-        if (selected >= 0 && items[selected]) {
-          window.location.href = items[selected].url;
+        const flattened = [
+          ...(items?.companies ?? []),
+          ...(items?.contacts ?? []),
+          ...(items?.deals ?? []),
+        ];
+        if (selected >= 0 && flattened[selected]) {
+          window.location.href = flattened[selected].url;
           if (options?.closeOnSelect) close();
         }
       } else if (e.key === "Escape") {
@@ -294,41 +336,35 @@
     return close;
   }
 
-  function wireGlobalSearch() {
-    const input = qs("#globalSearch");
-    const panel = qs("#globalSearchResults");
-    if (!input || !panel) return;
-    const close = wireSearch(input, panel, { closeOnSelect: true });
-    document.addEventListener("click", (e) => {
-      if (
-        e.target.closest("#globalSearch") ||
-        e.target.closest("#globalSearchResults")
-      )
-        return;
-      close();
-    });
-  }
 
-  function wirePalette() {
-    paletteEl = qs("#commandPalette");
-    paletteInput = qs("#paletteSearch");
-    palettePanel = qs("#paletteResults");
-    if (!paletteEl || !paletteInput || !palettePanel) return;
+  function wireSearchOverlay() {
+    searchOverlayEl = qs("#searchOverlay");
+    searchOverlayInput = qs("#searchOverlayInput");
+    searchOverlayPanel = qs("#searchOverlayResults");
+    if (!searchOverlayEl || !searchOverlayInput || !searchOverlayPanel) return;
 
     const close = () => {
-      closePalette();
+      closeSearchOverlay();
     };
-    const closeSearch = wireSearch(paletteInput, palettePanel, {
+    const closeSearch = wireSearch(searchOverlayInput, searchOverlayPanel, {
       closeOnSelect: true,
       onEscape: close,
     });
 
-    paletteEl.addEventListener("click", (e) => {
-      if (e.target.closest("[data-palette-close]")) {
+    searchOverlayEl.addEventListener("click", (e) => {
+      if (e.target.closest("[data-search-close]")) {
         closeSearch();
         close();
       }
     });
+
+    const openBtn = qs("#openSearchOverlay");
+    if (openBtn) {
+      openBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        openSearchOverlay();
+      });
+    }
   }
 
   window.applyTheme = applyTheme;
@@ -337,7 +373,7 @@
   window.getThemePreference = getThemePreference;
   window.openModal = openModal;
   window.closeModal = closeModal;
-  window.openPalette = openPalette;
+  window.openSearchOverlay = openSearchOverlay;
   window.showToast = showToast;
   window.toggleSidebar = toggleSidebar;
   window.openSidebar = openSidebar;
@@ -351,9 +387,8 @@
     wireSidebarAutoClose();
     wireUserMenu();
     wireNotifications();
-    wirePaletteShortcut();
-    wireGlobalSearch();
-    wirePalette();
+    wireSearchShortcut();
+    wireSearchOverlay();
     const year = document.getElementById("year");
     if (year) year.textContent = new Date().getFullYear();
 

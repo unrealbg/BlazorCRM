@@ -53,6 +53,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using Npgsql;
+using Crm.Domain.Entities;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -961,97 +962,94 @@ api.MapGet("/search", async (
     [FromQuery] string? q,
     CrmDbContext db,
     IMemoryCache cache,
-    ITenantProvider tenantProvider) =>
+    ITenantProvider tenantProvider,
+    CancellationToken ct) =>
 {
     var query = (q ?? string.Empty).Trim();
     if (string.IsNullOrWhiteSpace(query))
     {
-        return Results.Ok(Array.Empty<SearchResultDto>());
+        return Results.Ok(new SearchGroupResultDto(
+            Array.Empty<SearchResultDto>(),
+            Array.Empty<SearchResultDto>(),
+            Array.Empty<SearchResultDto>()));
     }
 
     var tenantId = tenantProvider.TenantId;
     var cacheKey = $"search:{tenantId}:{query.ToLowerInvariant()}";
-    if (cache.TryGetValue<List<SearchResultDto>>(cacheKey, out var cached) && cached is not null)
+    if (cache.TryGetValue<SearchGroupResultDto>(cacheKey, out var cached) && cached is not null)
     {
         return Results.Ok(cached);
     }
 
-    List<SearchResultDto> results;
+    const int maxPerGroup = 8;
+    var pattern = $"{query}%";
     var isNpgsql = db.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true;
-        if (isNpgsql)
-        {
-            FormattableString sql = $@"
-SELECT 'company' AS type,
-             c.""Id"" AS id,
-             c.""Name"" AS title,
-             COALESCE(c.""Industry"", c.""Address"") AS subtitle,
-             ts_rank(c.""SearchVector"", websearch_to_tsquery('simple', unaccent({query}))) AS rank,
-             ('/companies/' || c.""Id"") AS url
-FROM ""Companies"" c
-WHERE c.""TenantId"" = {tenantId}
-    AND c.""SearchVector"" @@ websearch_to_tsquery('simple', unaccent({query}))
 
-UNION ALL
+    IQueryable<Company> companyQuery = db.Companies.AsNoTracking().Where(c => c.TenantId == tenantId);
+    IQueryable<Contact> contactQuery = db.Contacts.AsNoTracking().Where(c => c.TenantId == tenantId);
+    IQueryable<Deal> dealQuery = db.Deals.AsNoTracking().Where(d => d.TenantId == tenantId);
 
-SELECT 'contact' AS type,
-             c.""Id"" AS id,
-             (c.""FirstName"" || ' ' || c.""LastName"") AS title,
-             COALESCE(c.""Email"", c.""Phone"") AS subtitle,
-             ts_rank(c.""SearchVector"", websearch_to_tsquery('simple', unaccent({query}))) AS rank,
-             ('/contacts/' || c.""Id"") AS url
-FROM ""Contacts"" c
-WHERE c.""TenantId"" = {tenantId}
-    AND c.""SearchVector"" @@ websearch_to_tsquery('simple', unaccent({query}))
+    if (isNpgsql)
+    {
+        companyQuery = companyQuery.Where(c =>
+            EF.Functions.ILike(c.Name, pattern)
+            || (c.Industry != null && EF.Functions.ILike(c.Industry, pattern))
+            || (c.Address != null && EF.Functions.ILike(c.Address, pattern)));
 
-UNION ALL
+        contactQuery = contactQuery.Where(c =>
+            EF.Functions.ILike(c.FirstName, pattern)
+            || EF.Functions.ILike(c.LastName, pattern)
+            || (c.Email != null && EF.Functions.ILike(c.Email, pattern))
+            || (c.Phone != null && EF.Functions.ILike(c.Phone, pattern)));
 
-SELECT 'deal' AS type,
-             d.""Id"" AS id,
-             d.""Title"" AS title,
-             CASE WHEN d.""Amount"" > 0 THEN (d.""Amount""::text || ' ' || d.""Currency"") ELSE d.""Currency"" END AS subtitle,
-             ts_rank(d.""SearchVector"", websearch_to_tsquery('simple', unaccent({query}))) AS rank,
-             ('/deals/' || d.""Id"") AS url
-FROM ""Deals"" d
-WHERE d.""TenantId"" = {tenantId}
-    AND d.""SearchVector"" @@ websearch_to_tsquery('simple', unaccent({query}))
-
-ORDER BY rank DESC
-LIMIT 20;";
-
-                var rows = await db.Set<SearchResultRow>().FromSqlInterpolated(sql).ToListAsync();
-                results = rows.Select(r => new SearchResultDto(r.Type, r.Id, r.Title, r.Subtitle, r.Rank, r.Url)).ToList();
-        }
+        dealQuery = dealQuery.Where(d =>
+            EF.Functions.ILike(d.Title, pattern)
+            || (d.Currency != null && EF.Functions.ILike(d.Currency, pattern)));
+    }
     else
     {
-        var companies = db.Companies.AsNoTracking()
-            .AsEnumerable()
-            .Where(c => c.Name.Contains(query, StringComparison.OrdinalIgnoreCase)
-                        || (c.Industry?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)
-                        || (c.Address?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false))
-            .Select(c => new SearchResultDto("company", c.Id, c.Name, c.Industry ?? c.Address, 1d, $"/companies/{c.Id}"));
+        companyQuery = companyQuery.Where(c =>
+            EF.Functions.Like(c.Name, pattern)
+            || (c.Industry != null && EF.Functions.Like(c.Industry, pattern))
+            || (c.Address != null && EF.Functions.Like(c.Address, pattern)));
 
-        var contacts = db.Contacts.AsNoTracking()
-            .AsEnumerable()
-            .Where(c => ($"{c.FirstName} {c.LastName}").Contains(query, StringComparison.OrdinalIgnoreCase)
-                        || (c.Email?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)
-                        || (c.Phone?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false))
-            .Select(c => new SearchResultDto("contact", c.Id, c.FirstName + " " + c.LastName, c.Email ?? c.Phone, 1d, $"/contacts/{c.Id}"));
+        contactQuery = contactQuery.Where(c =>
+            EF.Functions.Like(c.FirstName, pattern)
+            || EF.Functions.Like(c.LastName, pattern)
+            || (c.Email != null && EF.Functions.Like(c.Email, pattern))
+            || (c.Phone != null && EF.Functions.Like(c.Phone, pattern)));
 
-        var deals = db.Deals.AsNoTracking()
-            .AsEnumerable()
-            .Where(d => d.Title.Contains(query, StringComparison.OrdinalIgnoreCase)
-                        || (d.Currency?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false))
-            .Select(d => new SearchResultDto("deal", d.Id, d.Title, d.Amount > 0 ? $"{d.Amount:C0} {d.Currency}" : d.Currency, 1d, $"/deals/{d.Id}"));
-
-        results = companies.Concat(contacts).Concat(deals).Take(20).ToList();
+        dealQuery = dealQuery.Where(d =>
+            EF.Functions.Like(d.Title, pattern)
+            || (d.Currency != null && EF.Functions.Like(d.Currency, pattern)));
     }
 
-    cache.Set(cacheKey, results, new MemoryCacheEntryOptions
+    var companies = await companyQuery
+        .OrderBy(c => c.Name)
+        .Take(maxPerGroup)
+        .Select(c => new SearchResultDto("company", c.Id, c.Name, c.Industry ?? c.Address, 1d, $"/companies/{c.Id}"))
+        .ToListAsync(ct);
+
+    var contacts = await contactQuery
+        .OrderBy(c => c.LastName).ThenBy(c => c.FirstName)
+        .Take(maxPerGroup)
+        .Select(c => new SearchResultDto("contact", c.Id, c.FirstName + " " + c.LastName, c.Email ?? c.Phone, 1d, $"/contacts/{c.Id}"))
+        .ToListAsync(ct);
+
+    var deals = await dealQuery
+        .OrderBy(d => d.Title)
+        .Take(maxPerGroup)
+        .Select(d => new SearchResultDto("deal", d.Id, d.Title, d.Amount > 0 ? $"{d.Amount:C0} {d.Currency}" : d.Currency, 1d, $"/deals/{d.Id}"))
+        .ToListAsync(ct);
+
+    var grouped = new SearchGroupResultDto(companies, contacts, deals);
+
+    cache.Set(cacheKey, grouped, new MemoryCacheEntryOptions
     {
         AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(60)
     });
 
-    return Results.Ok(results);
+    return Results.Ok(grouped);
 });
 
 api.MapPost("/companies", async ([FromBody] CreateCompany cmd, [FromServices] IMediator m) => Results.Ok(await m.Send(cmd)));
