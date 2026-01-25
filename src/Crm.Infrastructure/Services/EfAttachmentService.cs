@@ -37,7 +37,8 @@ namespace Crm.Infrastructure.Services
 
         public async Task<Stream> OpenReadAsync(Guid id, CancellationToken ct = default)
         {
-            var entity = await _db.Attachments.AsNoTracking().FirstAsync(a => a.Id == id, ct);
+            var entity = await _db.Attachments.FirstAsync(a => a.Id == id, ct);
+            await NormalizeBlobRefAsync(entity, ct);
             return await _storage.OpenReadAsync(entity.BlobRef!, ct);
         }
 
@@ -51,6 +52,7 @@ namespace Crm.Infrastructure.Services
 
             if (!string.IsNullOrEmpty(entity.BlobRef))
             {
+                await NormalizeBlobRefAsync(entity, ct);
                 await _storage.DeleteAsync(entity.BlobRef, ct);
             }
 
@@ -61,5 +63,24 @@ namespace Crm.Infrastructure.Services
 
         public async Task<IEnumerable<Attachment>> GetForAsync(RelatedToType relatedTo, Guid relatedId, CancellationToken ct = default)
             => await _db.Attachments.AsNoTracking().Where(a => a.RelatedTo == relatedTo && a.RelatedId == relatedId).OrderByDescending(a => a.Id).ToListAsync(ct);
+
+        private async Task NormalizeBlobRefAsync(Attachment entity, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(entity.BlobRef))
+            {
+                throw new InvalidOperationException("Attachment storage path is missing.");
+            }
+
+            if (_storage is not Crm.Infrastructure.Files.LocalFileStorage local)
+            {
+                return;
+            }
+
+            if (local.NormalizeExistingPath(entity.BlobRef, out var relative))
+            {
+                entity.BlobRef = relative;
+                await _db.SaveChangesAsync(ct);
+            }
+        }
     }
 }

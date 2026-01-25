@@ -50,6 +50,7 @@ using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Options;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -361,7 +362,19 @@ app.UseExceptionHandler(appBuilder =>
         var title = "Server error";
         var detail = "An unexpected error occurred.";
 
-        if (ex is PermissionDeniedException p)
+        if (ex is Crm.Infrastructure.Files.AttachmentStorageException a)
+        {
+            status = a.StatusCode;
+            title = status switch
+            {
+                StatusCodes.Status413PayloadTooLarge => "Payload Too Large",
+                StatusCodes.Status415UnsupportedMediaType => "Unsupported Media Type",
+                _ => "Bad Request"
+            };
+            detail = a.Message;
+            logger.LogWarning(ex, "Attachment storage rejected request.");
+        }
+        else if (ex is PermissionDeniedException p)
         {
             status = p.IsAuthenticated ? StatusCodes.Status403Forbidden : StatusCodes.Status401Unauthorized;
             title = status == StatusCodes.Status401Unauthorized ? "Unauthorized" : "Forbidden";
@@ -1135,13 +1148,15 @@ api.MapGet("/companies/industries", async (
 }).CacheOutput("industries");
 
 // Attachments download
-app.MapGet("/attachments/{id:guid}", async (Guid id, CrmDbContext db, IAttachmentService svc) =>
+app.MapGet("/attachments/{id:guid}", async (Guid id, CrmDbContext db, IAttachmentService svc, IOptions<Crm.Infrastructure.Files.AttachmentStorageOptions> options) =>
 {
     var entity = await db.Attachments.AsNoTracking().FirstOrDefaultAsync(a => a.Id == id);
     if (entity is null) return Results.NotFound();
     var stream = await svc.OpenReadAsync(id);
     var contentType = string.IsNullOrWhiteSpace(entity.ContentType) ? "application/octet-stream" : entity.ContentType;
-    var fileName = string.IsNullOrWhiteSpace(entity.FileName) ? id.ToString() : entity.FileName;
+    var maxName = options.Value.MaxFileNameLength > 0 ? options.Value.MaxFileNameLength : 120;
+    var rawName = string.IsNullOrWhiteSpace(entity.FileName) ? id.ToString() : entity.FileName;
+    var fileName = Crm.Infrastructure.Files.LocalFileStorage.SanitizeFileName(rawName, maxName);
     return Results.Stream(stream, contentType: contentType, fileDownloadName: fileName);
 }).RequireAuthorization().RequireRateLimiting("api");
 
