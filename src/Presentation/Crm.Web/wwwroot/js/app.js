@@ -172,11 +172,7 @@
   }
 
   function wireNotifications() {
-    const btn = qs("#notifBtn");
-    if (!btn) return;
-    btn.addEventListener("click", () => {
-      showToast("Notifications panel is not wired yet", "info");
-    });
+    // Notifications now handled by NotificationsPanel.razor component
   }
 
   function wireSearchShortcut() {
@@ -380,6 +376,30 @@
   window.publish = publish;
   window.subscribe = subscribe;
   window.unsubscribe = unsubscribe;
+
+  // Mobile nav drawer escape key handler
+  let escapeKeyHandler = null;
+  window.addGlobalEscapeListener = function(dotNetRef) {
+    if (escapeKeyHandler) return;
+    
+    escapeKeyHandler = (e) => {
+      if (e.key === 'Escape' || e.keyCode === 27) {
+        try {
+          dotNetRef.invokeMethodAsync('HandleEscapeKey');
+        } catch {
+          /* no-op */
+        }
+      }
+    };
+    document.addEventListener('keydown', escapeKeyHandler);
+  };
+  
+  window.removeGlobalEscapeListener = function() {
+    if (escapeKeyHandler) {
+      document.removeEventListener('keydown', escapeKeyHandler);
+      escapeKeyHandler = null;
+    }
+  };
 
   applyTheme();
   document.addEventListener("DOMContentLoaded", () => {

@@ -1,8 +1,6 @@
-@rendermode InteractiveServer
-
 <nav class="p-3 space-y-2 text-[15px]">
   <div class="crm-nav-section">CRM</div>
-  <NavLink class="crm-nav-item" ActiveClass="crm-nav-item--active" href="/" Match="NavLinkMatch.All">
+  <NavLink class="crm-nav-item" ActiveClass="crm-nav-item--active" href="/" Match="NavLinkMatch.All" @onclick="HandleNavigate">
     <span class="crm-nav-left">
       <span class="crm-nav-icon" aria-hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -14,7 +12,7 @@
       <span class="crm-nav-label">Dashboard</span>
     </span>
   </NavLink>
-  <NavLink class="crm-nav-item" ActiveClass="crm-nav-item--active" href="/companies" Match="NavLinkMatch.Prefix">
+  <NavLink class="crm-nav-item" ActiveClass="crm-nav-item--active" href="/companies" Match="NavLinkMatch.Prefix" @onclick="HandleNavigate">
     <span class="crm-nav-left">
       <span class="crm-nav-icon" aria-hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -27,7 +25,7 @@
       <span class="crm-nav-label">Companies</span>
     </span>
   </NavLink>
-  <NavLink class="crm-nav-item" ActiveClass="crm-nav-item--active" href="/contacts" Match="NavLinkMatch.Prefix">
+  <NavLink class="crm-nav-item" ActiveClass="crm-nav-item--active" href="/contacts" Match="NavLinkMatch.Prefix" @onclick="HandleNavigate">
     <span class="crm-nav-left">
       <span class="crm-nav-icon" aria-hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -38,7 +36,7 @@
       <span class="crm-nav-label">Contacts</span>
     </span>
   </NavLink>
-  <NavLink class="crm-nav-item" ActiveClass="crm-nav-item--active" href="/deals" Match="NavLinkMatch.Prefix">
+  <NavLink class="crm-nav-item" ActiveClass="crm-nav-item--active" href="/deals" Match="NavLinkMatch.Prefix" @onclick="HandleNavigate">
     <span class="crm-nav-left">
       <span class="crm-nav-icon" aria-hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -51,7 +49,7 @@
       <span class="crm-nav-label">Deals</span>
     </span>
   </NavLink>
-  <NavLink class="crm-nav-item" ActiveClass="crm-nav-item--active" href="/activities" Match="NavLinkMatch.Prefix">
+  <NavLink class="crm-nav-item" ActiveClass="crm-nav-item--active" href="/activities" Match="NavLinkMatch.Prefix" @onclick="HandleNavigate">
     <span class="crm-nav-left">
       <span class="crm-nav-icon" aria-hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -66,7 +64,7 @@
       <span class="crm-nav-label">Activities</span>
     </span>
   </NavLink>
-  <NavLink class="crm-nav-item" ActiveClass="crm-nav-item--active" href="/tasks" Match="NavLinkMatch.Prefix">
+  <NavLink class="crm-nav-item" ActiveClass="crm-nav-item--active" href="/tasks" Match="NavLinkMatch.Prefix" @onclick="HandleNavigate">
     <span class="crm-nav-left">
       <span class="crm-nav-icon" aria-hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -79,7 +77,7 @@
   </NavLink>
 
   <div class="crm-nav-section mt-4">System</div>
-  <NavLink class="crm-nav-item" ActiveClass="crm-nav-item--active" href="/settings" Match="NavLinkMatch.Prefix">
+  <NavLink class="crm-nav-item" ActiveClass="crm-nav-item--active" href="/settings" Match="NavLinkMatch.Prefix" @onclick="HandleNavigate">
     <span class="crm-nav-left">
       <span class="crm-nav-icon" aria-hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">

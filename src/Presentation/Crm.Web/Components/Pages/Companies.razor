@@ -7,12 +7,11 @@
 
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
   <div>
-    <h1 class="crm-page-title text-2xl font-semibold">Companies</h1>
+    <h1 class="text-2xl font-semibold">Companies</h1>
     <div class="text-xs text-slate-500">Manage accounts, filters, and saved views.</div>
   </div>
   <div class="flex items-center gap-2">
     <UiButton Variant="primary" OnClick="ShowQuickCreate">+ New Company</UiButton>
-    <label class="ui-btn ui-btn-muted cursor-pointer">Import CSV<input type="file" class="hidden" /></label>
   </div>
 </div>
 
@@ -21,7 +20,7 @@
     <div class="min-w-[220px] flex-1">
       <UiInput @bind-Value="_search" Placeholder="Search companies..." />
     </div>
-    <div class="w-56">
+    <div class="w-56 hidden md:block">
       <UiSelect @bind-Value="_industry">
         <option value="">All industries</option>
         @foreach (var ind in _industries)
@@ -30,7 +29,7 @@
         }
       </UiSelect>
     </div>
-    <div class="w-36">
+    <div class="w-36 hidden md:block">
       <InputSelect class="ui-select" @bind-Value="_pageSize">
         <option value="5">5 / page</option>
         <option value="10">10 / page</option>
@@ -38,26 +37,13 @@
       </InputSelect>
     </div>
     <UiButton Variant="muted" OnClick="ApplyFilters">Apply</UiButton>
-    <UiButton Variant="muted" OnClick="ClearFilters">Clear</UiButton>
     <div class="ml-auto text-xs text-slate-500">@(_total) results</div>
-  </div>
-
-  <div class="mt-3 flex flex-wrap items-center gap-2">
-    <span class="text-[11px] uppercase tracking-wide text-slate-500">Saved views</span>
-    <InputSelect class="ui-select w-48" @bind-Value="_selectedView" @onchange="OnViewChanged">
-      <option value="">Select view</option>
-      @foreach (var view in _views)
-      {
-        <option value="@view.Name">@view.Name</option>
-      }
-    </InputSelect>
-    <UiInput Class="w-56" @bind-Value="_newViewName" Placeholder="Save current view as..." />
-    <UiButton Variant="muted" OnClick="SaveView">Save view</UiButton>
   </div>
 </UiCard>
 
+<div class="hidden md:block">
 <UiCard Class="p-0 crm-table-wrap">
-  <UiTable Class="min-w-full text-sm crm-table-desktop">
+  <UiTable Class="min-w-full text-sm">
     <thead class="bg-white/50 dark:bg-slate-800/40">
       <tr class="text-slate-600 dark:text-slate-300">
         <th class="px-4 py-3 text-left cursor-pointer" @onclick="() => SortBy(nameof(Crm.Domain.Entities.Company.Name))">Company @SortGlyph(nameof(Crm.Domain.Entities.Company.Name))</th>
@@ -90,7 +76,7 @@
             <td class="px-4 py-3">@c.Industry</td>
             <td class="px-4 py-3 text-right">
               <button class="link" @onclick="() => View(c.Id)">View</button>
-              <button class="link" @onclick="() => Edit(c.Id)">Edit</button>
+              <button class="link ml-2" @onclick="() => Edit(c.Id)">Edit</button>
             </td>
           </tr>
         }
@@ -99,19 +85,27 @@
   </UiTable>
 </UiCard>
 
-<div class="crm-card-list">
-  @if (_loading)
+@if (_pages > 1)
+{
+  <div class="mt-3 flex items-center justify-between gap-2 text-sm">
+    <div>Showing @StartRow-@EndRow of @_total</div>
+    <div class="inline-flex gap-2">
+      <UiButton Variant="muted" Disabled="@(_page==1)" OnClick="PrevPage">Prev</UiButton>
+      <UiButton Variant="muted" Disabled="@(_page==_pages)" OnClick="NextPage">Next</UiButton>
+    </div>
+  </div>
+}
+</div>
+
+<div class="block md:hidden">
+  @if (_loading && _mobilePage == 1)
   {
     @for (var i = 0; i < 5; i++)
     {
       <UiCard Class="p-4 mb-3">
         <div class="space-y-2">
-          <UiSkeleton Style="height:14px;width:70%" />
-          <UiSkeleton Style="height:12px;width:40%" />
-          <div class="flex gap-2">
-            <UiSkeleton Style="height:14px;width:64px" />
-            <UiSkeleton Style="height:14px;width:64px" />
-          </div>
+          <UiSkeleton Style="height:18px;width:70%" />
+          <UiSkeleton Style="height:14px;width:40%" />
         </div>
       </UiCard>
     }
@@ -127,14 +121,14 @@
     @foreach (var c in _mobileItems)
     {
       <UiCard Class="p-4 mb-3">
-        <div class="flex items-start justify-between gap-3">
+        <div class="flex flex-col gap-3">
           <div>
-            <div class="font-semibold">@c.Name</div>
-            <div class="text-xs text-slate-500">@c.Industry</div>
+            <div class="font-semibold text-base">@c.Name</div>
+            <div class="text-sm text-slate-500 mt-1">@c.Industry</div>
           </div>
-          <div class="flex gap-2">
-            <button class="link crm-tap" @onclick="() => View(c.Id)">View</button>
-            <button class="link crm-tap" @onclick="() => Edit(c.Id)">Edit</button>
+          
+          <div class="flex gap-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+            <button class="btn btn-primary flex-1 min-h-[44px]" @onclick="() => View(c.Id)">Open</button>
           </div>
         </div>
       </UiCard>
@@ -144,21 +138,10 @@
   @if (!_loading && _mobilePage < _pages)
   {
     <div class="mt-3">
-      <UiButton Variant="muted" Class="w-full crm-tap" OnClick="LoadMoreMobile">Load more</UiButton>
+      <UiButton Variant="primary" Class="w-full min-h-[48px]" OnClick="LoadMoreMobile" Disabled="@_loading">
+        @if (_loading) { <span>Loading...</span> } else { <span>Load more</span> }
+      </UiButton>
       <div class="mt-2 text-xs text-slate-500 text-center">Showing @_mobileItems.Count of @_total</div>
     </div>
   }
 </div>
-
-@if (_pages > 1)
-{
-  <div class="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
-    <div>Showing @StartRow-@EndRow of @_total</div>
-    <div class="inline-flex gap-2">
-      <UiButton Variant="muted" Disabled="@(_page==1)" OnClick="PrevPage">Prev</UiButton>
-      <UiButton Variant="muted" Disabled="@(_page==_pages)" OnClick="NextPage">Next</UiButton>
-    </div>
-  </div>
-}
-
-
