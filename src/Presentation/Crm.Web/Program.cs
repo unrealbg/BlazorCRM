@@ -19,6 +19,7 @@ using Crm.Infrastructure.Files;
 using Crm.Application.Common.Abstractions;
 using Crm.Application.Notifications;
 using Crm.Infrastructure.Notifications;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.IdentityModel.Tokens;
@@ -323,6 +324,7 @@ builder.Services.AddSignalR();
 builder.Services.AddScoped<Crm.Web.Services.NotificationsService>();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<Crm.Web.Services.ThemeState>();
+builder.Services.AddScoped<Crm.Web.Services.MobileNavState>();
 
 var app = builder.Build();
 
@@ -581,7 +583,6 @@ if (app.Environment.IsDevelopment())
 app.UseCors();
 app.UseRateLimiter();
 
-app.UseMiddleware<TenantResolutionMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -1128,6 +1129,19 @@ app.MapHealthChecks("/health/ready").AllowAnonymous();
 
 // SignalR hub
 app.MapHub<NotificationsHub>("/hubs/notifications");
+
+// Test notification endpoint (dev only)
+if (app.Environment.IsDevelopment())
+{
+    app.MapPost("/api/dev/notify", async (INotificationService notifSvc, IHubContext<NotificationsHub> hub, string? message, string? severity) =>
+    {
+        var msg = message ?? "Test notification";
+        var sev = severity ?? "Info";
+        await notifSvc.AddAsync(msg, sev);
+        await hub.Clients.All.SendAsync("notify", new { Title = "CRM", Body = msg, Severity = sev });
+        return Results.Ok(new { message = "Notification sent" });
+    }).AllowAnonymous();
+}
 
 // Ensure static web assets endpoints are anonymous
 app.MapStaticAssets().AllowAnonymous();

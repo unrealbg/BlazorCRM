@@ -6,7 +6,7 @@ namespace Crm.Web.Components
     using System;
     using System.Threading.Tasks;
 
-    public partial class App
+    public partial class AppShell : IDisposable
     {
         [Inject] 
         IJSRuntime JS { get; set; } = default!;
@@ -14,11 +14,16 @@ namespace Crm.Web.Components
         [Inject] 
         Crm.Web.Services.ThemeState Theme { get; set; } = default!;
 
+        [Inject]
+        Crm.Web.Services.MobileNavState MobileNav { get; set; } = default!;
+
         bool SidebarCollapsed { get; set; }
+        private DotNetObjectReference<AppShell>? _dotNetRef;
 
         protected override void OnInitialized()
         {
             Theme.OnChange += OnThemeChanged;
+            MobileNav.OnChange += OnMobileNavChanged;
         }
 
         async Task ToggleTheme()
@@ -33,6 +38,22 @@ namespace Crm.Web.Components
             SidebarCollapsed = !SidebarCollapsed;
         }
 
+        void ToggleMobileNav()
+        {
+            MobileNav.Toggle();
+        }
+
+        void CloseMobileNav()
+        {
+            MobileNav.Close();
+        }
+
+        [JSInvokable]
+        public void HandleEscapeKey()
+        {
+            CloseMobileNav();
+        }
+
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
             if (!firstRender) return;
@@ -42,6 +63,9 @@ namespace Crm.Web.Components
                 var isDark = string.Equals(initial, "dark", StringComparison.OrdinalIgnoreCase);
                 Theme.Set(isDark);
                 await JS.InvokeVoidAsync("setTheme", isDark, false);
+
+                _dotNetRef = DotNetObjectReference.Create(this);
+                await JS.InvokeVoidAsync("addGlobalEscapeListener", _dotNetRef);
             }
             catch (InvalidOperationException)
             {
@@ -50,10 +74,25 @@ namespace Crm.Web.Components
         }
 
         void OnThemeChanged() => InvokeAsync(StateHasChanged);
+        void OnMobileNavChanged() => InvokeAsync(StateHasChanged);
 
         public void Dispose()
         {
             Theme.OnChange -= OnThemeChanged;
+            MobileNav.OnChange -= OnMobileNavChanged;
+            
+            if (_dotNetRef is not null)
+            {
+                try
+                {
+                    JS.InvokeVoidAsync("removeGlobalEscapeListener");
+                }
+                catch
+                {
+                    // Ignore disposal errors
+                }
+                _dotNetRef.Dispose();
+            }
         }
     }
 }

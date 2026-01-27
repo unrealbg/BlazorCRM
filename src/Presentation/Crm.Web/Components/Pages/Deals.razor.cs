@@ -86,8 +86,7 @@ namespace Crm.Web.Components.Pages
 
         private async Task LoadPipelines()
         {
-            var ct = _disposeCts.Token;
-            _pipelines = (await PipelineService.GetPipelinesAsync(ct: ct)).ToList();
+            _pipelines = (await PipelineService.GetPipelinesAsync()).ToList();
             _selectedPipelineId = _pipelines.FirstOrDefault()?.Id ?? Guid.Empty;
         }
 
@@ -96,10 +95,10 @@ namespace Crm.Web.Components.Pages
             _loading = true;
             try
             {
-                                var ct = _disposeCts.Token;
+                var ct = _disposeCts.Token;
                 _stages = _selectedPipelineId == Guid.Empty
-                  ? new()
-                                    : (await PipelineService.GetStagesAsync(_selectedPipelineId, ct)).OrderBy(s => s.Order).ToList();
+                    ? new()
+                    : (await PipelineService.GetStagesAsync(_selectedPipelineId, ct)).OrderBy(s => s.Order).ToList();
 
                 _stageNameMap = _stages.ToDictionary(s => s.Id, s => s.Name);
 
