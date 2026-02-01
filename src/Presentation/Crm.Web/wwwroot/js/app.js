@@ -379,24 +379,24 @@
 
   // Mobile nav drawer escape key handler
   let escapeKeyHandler = null;
-  window.addGlobalEscapeListener = function(dotNetRef) {
+  window.addGlobalEscapeListener = function (dotNetRef) {
     if (escapeKeyHandler) return;
-    
+
     escapeKeyHandler = (e) => {
-      if (e.key === 'Escape' || e.keyCode === 27) {
+      if (e.key === "Escape" || e.keyCode === 27) {
         try {
-          dotNetRef.invokeMethodAsync('HandleEscapeKey');
+          dotNetRef.invokeMethodAsync("HandleEscapeKey");
         } catch {
           /* no-op */
         }
       }
     };
-    document.addEventListener('keydown', escapeKeyHandler);
+    document.addEventListener("keydown", escapeKeyHandler);
   };
-  
-  window.removeGlobalEscapeListener = function() {
+
+  window.removeGlobalEscapeListener = function () {
     if (escapeKeyHandler) {
-      document.removeEventListener('keydown', escapeKeyHandler);
+      document.removeEventListener("keydown", escapeKeyHandler);
       escapeKeyHandler = null;
     }
   };
